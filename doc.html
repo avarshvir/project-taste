@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Project Taste documentation — what every developer tool does, how to use it, features, and keyboard shortcuts." />
+  <meta name="theme-color" content="#0284c7" />
+  <title>Documentation — Project Taste</title>
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍋</text></svg>" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
+
+  <!-- Shared Project Taste styles -->
+  <link rel="stylesheet" href="assets/css/theme.css" />
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <link rel="stylesheet" href="assets/css/components.css" />
+  <link rel="stylesheet" href="assets/css/tools.css" />
+
+  <!-- No-flash theme (same approach as index.html) -->
+  <script>
+    (function () {
+      try {
+        var saved = localStorage.getItem('taste:theme');
+        var accent = localStorage.getItem('taste:accent');
+        var system = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', (saved && JSON.parse(saved)) || system);
+        if (accent) document.documentElement.setAttribute('data-accent', JSON.parse(accent));
+      } catch (e) {}
+    })();
+  </script>
+
+  <style>
+    /* ---- Doc-page-specific layout (reuses tokens) ---- */
+    .doc-wrap { display: flex; gap: var(--sp-6); max-width: 1200px; margin: 0 auto; padding: var(--sp-6) var(--sp-5) var(--sp-8); align-items: flex-start; }
+    .doc-toc { position: sticky; top: calc(var(--navbar-h) + var(--sp-5)); flex: 0 0 230px; max-height: calc(100vh - var(--navbar-h) - var(--sp-6)); overflow-y: auto; }
+    .doc-toc h3 { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--text-subtle); margin-bottom: var(--sp-2); }
+    .doc-toc a { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--text-muted); }
+    .doc-toc a:hover { background: var(--surface-hover); color: var(--text); }
+    .doc-toc a .count { margin-left: auto; font-size: var(--fs-xs); color: var(--text-subtle); }
+    .doc-main { flex: 1 1 auto; min-width: 0; }
+
+    .doc-hero { text-align: center; padding: var(--sp-6) 0 var(--sp-5); }
+    .doc-hero h1 { font-size: var(--fs-3xl); letter-spacing: -0.03em; margin-bottom: var(--sp-3); }
+    .doc-hero h1 .hero-accent { color: var(--accent); }
+    .doc-hero p { color: var(--text-muted); font-size: var(--fs-lg); max-width: 640px; margin: 0 auto; }
+    .doc-metarow { display: flex; gap: var(--sp-2); justify-content: center; flex-wrap: wrap; margin-top: var(--sp-4); }
+
+    .doc-search { position: relative; max-width: 520px; margin: var(--sp-5) auto; }
+    .doc-search i { position: absolute; left: var(--sp-3); top: 50%; transform: translateY(-50%); color: var(--text-subtle); }
+    .doc-search input { width: 100%; height: 44px; padding: 0 var(--sp-3) 0 2.4rem; font-size: var(--fs-md); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); }
+    .doc-search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+    .doc-cat { margin: var(--sp-7) 0 var(--sp-4); padding-top: var(--sp-3); }
+    .doc-cat-title { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-xl); }
+    .doc-cat-title .bi { color: var(--accent); }
+    .doc-cat-title .count { font-size: var(--fs-sm); color: var(--text-subtle); font-weight: var(--fw-regular); }
+
+    .doc-tool { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-xs); padding: var(--sp-4) var(--sp-5); margin-bottom: var(--sp-4); }
+    .doc-tool-head { display: flex; align-items: flex-start; gap: var(--sp-3); }
+    .doc-tool-icon { flex: 0 0 auto; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; font-size: var(--fs-lg); color: var(--accent); background: var(--accent-tint); border-radius: var(--radius-md); }
+    .doc-tool-headtext { flex: 1 1 auto; min-width: 0; }
+    .doc-tool-headtext h4 { font-size: var(--fs-lg); display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+    .doc-tool-headtext p { margin: var(--sp-1) 0 0; color: var(--text-muted); font-size: var(--fs-base); }
+    .doc-status { font-size: var(--fs-xs); font-weight: var(--fw-semibold); padding: .1em .6em; border-radius: var(--radius-full); }
+    .doc-status.ready { background: var(--badge-new-bg); color: var(--badge-new-text); }
+    .doc-status.soon  { background: var(--bg-subtle); color: var(--text-subtle); border: 1px dashed var(--border-strong); }
+
+    .doc-detail { margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px dashed var(--border); }
+    .doc-detail h5 { font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .05em; color: var(--text-subtle); margin: var(--sp-3) 0 var(--sp-2); display: flex; align-items: center; gap: var(--sp-2); }
+    .doc-detail h5 .bi { color: var(--accent); }
+    .doc-detail ul { margin: 0; padding-left: var(--sp-5); }
+    .doc-detail li { margin-bottom: var(--sp-1); color: var(--text); font-size: var(--fs-base); }
+    .doc-detail li code, .doc-detail p code { font-size: .85em; }
+    .doc-open-btn { margin-top: var(--sp-3); }
+
+    .doc-empty { text-align: center; color: var(--text-subtle); padding: var(--sp-8) 0; }
+
+    @media (max-width: 900px) { .doc-toc { display: none; } .doc-wrap { padding: var(--sp-5) var(--sp-4) var(--sp-7); } }
+  </style>
+</head>
+
+<body>
+  <!-- Minimal navbar -->
+  <nav class="app-navbar">
+    <div class="navbar-left">
+      <a class="brand" href="index.html">
+        <span class="brand-mark">🍋</span>
+        <span class="brand-text">Project <span class="brand-accent">Taste</span></span>
+      </a>
+    </div>
+    <div class="navbar-right">
+      <a class="nav-link-btn" href="index.html"><i class="bi bi-grid"></i><span class="nav-label">Tools</span></a>
+      <a class="nav-link-btn" href="index.html#/about"><i class="bi bi-info-circle"></i><span class="nav-label">About</span></a>
+      <button class="icon-btn theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Toggle theme">
+        <i class="bi bi-sun-fill theme-icon-light"></i>
+        <i class="bi bi-moon-stars-fill theme-icon-dark"></i>
+      </button>
+    </div>
+  </nav>
+
+  <div class="doc-wrap" style="padding-top:calc(var(--navbar-h) + var(--sp-4))">
+    <!-- Category jump-nav -->
+    <aside class="doc-toc" id="docToc" aria-label="Documentation categories">
+      <h3>Categories</h3>
+      <nav id="tocList"></nav>
+    </aside>
+
+    <!-- Main documentation -->
+    <main class="doc-main">
+      <div class="doc-hero">
+        <h1>Project <span class="hero-accent">Taste</span> Docs</h1>
+        <p>Everything you can do with Taste — what each tool is, what it does, and how to get the most out of it. All tools run <strong>entirely in your browser</strong>; your data never leaves your machine.</p>
+        <div class="doc-metarow" id="heroStats"></div>
+      </div>
+
+      <div class="doc-search">
+        <i class="bi bi-search"></i>
+        <input type="search" id="docSearch" placeholder="Search the docs…" autocomplete="off" />
+      </div>
+
+      <div id="docBody">
+        <p class="doc-empty"><i class="bi bi-arrow-repeat" style="animation:spin 1s linear infinite"></i> Loading documentation…</p>
+      </div>
+    </main>
+  </div>
+
+  <footer class="app-footer">
+    <p class="footer-text">Developed by a developer, for the developers, with <i class="bi bi-heart-fill footer-heart"></i> from an indie &amp; ML Engineer.</p>
+    <p class="footer-sub"><a href="index.html">Tools</a> · <a href="index.html#/about">About</a></p>
+  </footer>
+
+  <div class="toast-taste" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- utils + theme give us the toggle + storage for free -->
+  <script src="assets/js/utils.js"></script>
+  <script src="assets/js/theme.js"></script>
+
+  <script>
+  /* =======================================================================
+     Detailed documentation content for tools we've BUILT.
+     Keyed by tool id (matches data/tools.json). Tools not listed here fall
+     back to their one-line `desc` from the registry, tagged accordingly.
+     ======================================================================= */
+  var DOCS = {
+    'json-escape-unescape': {
+      what: 'Converts a string into a JSON-safe escaped form (and back). Useful when you need to embed text inside a JSON value — e.g. pasting a multi-line body into a Postman request, a config file, or a log field.',
+      features: [
+        'Escape uses native <code>JSON.stringify</code> so every reserved character (<code>\\n</code>, <code>\\t</code>, <code>\\"</code>, <code>\\\\</code>, etc.) is handled correctly.',
+        'Unescape parses the string back, with a manual fallback for partially-broken tokens.',
+        'Swap moves the result into the input for quick chaining.',
+        'Live character &amp; byte count on the result.'
+      ],
+      usage: [
+        'Paste raw text (or an escaped string) into the input.',
+        'Click <strong>Escape</strong> or <strong>Unescape</strong>.',
+        'Copy the result, or Swap it back into the input to reverse.'
+      ],
+      shortcuts: ['<kbd>Ctrl/⌘</kbd> + <kbd>Enter</kbd> — escape instantly'],
+      extras: ['Drag &amp; drop a text file onto the input', 'Input auto-saves and is restored next visit']
+    },
+    'base64': {
+      what: 'Encodes and decodes Base64 for both text and files. Handles UTF-8 correctly (emojis and non-Latin text round-trip cleanly) and can produce Base64 data URIs from images with a live preview.',
+      features: [
+        'UTF-8 safe: uses <code>TextEncoder</code>/<code>TextDecoder</code> so <code>btoa</code>-style corruption never happens.',
+        'URL-safe variant (<code>-</code>/<code>_</code>, no padding) for tokens and query strings.',
+        'File mode: drop any file to get its Base64 data URI, with optional <code>data:…;base64,</code> prefix.',
+        'Automatic image preview for image files.'
+      ],
+      usage: [
+        'Choose <strong>Text</strong> or <strong>File / Image</strong> mode.',
+        'For text: type/paste, then Encode or Decode.',
+        'For files: drop or browse a file — the Base64 output and preview appear instantly.'
+      ],
+      shortcuts: ['<kbd>Ctrl/⌘</kbd> + <kbd>Enter</kbd> — encode text'],
+      extras: ['Toggle URL-safe output', 'Copy or download either text or file output']
+    },
+    'case-converter': {
+      what: 'Transforms text between every common developer case style at once — no need to pick one at a time. A single smart tokenizer understands spaces, punctuation and camelCase boundaries, so any input converts cleanly.',
+      features: [
+        '10 formats: UPPERCASE, lowercase, Title Case, Sentence case, camelCase, PascalCase, snake_case, CONSTANT_CASE, kebab-case, dot.case.',
+        'Works on mixed input like <code>myVariable-name</code> or <code>Some Title</code> identically.',
+        'Per-format one-click copy.',
+        'Live word / character / byte stats.'
+      ],
+      usage: [
+        'Type or paste text — all conversions update live.',
+        'Click the copy icon next to any format to copy it.'
+      ],
+      shortcuts: [],
+      extras: ['Drag &amp; drop a text file', 'Input auto-saves']
+    },
+    'text-diff': {
+      what: 'Compares two blocks of text line-by-line and highlights exactly what was added, removed or left unchanged — like <code>git diff</code>, but in your browser for any text.',
+      features: [
+        'Real Longest-Common-Subsequence (LCS) algorithm — accurate on code, JSON or prose.',
+        'Color-coded output with +/− gutters and line numbers.',
+        'Ignore-case and ignore-whitespace options affect matching only, not the displayed text.',
+        'Added / removed / unchanged counts as stat chips.'
+      ],
+      usage: [
+        'Paste the original into pane A and the changed version into pane B.',
+        'Click <strong>Compare</strong>.',
+        'Optionally toggle Ignore case / whitespace, or Swap A↔B.'
+      ],
+      shortcuts: [],
+      extras: ['Drag &amp; drop a file onto either pane', 'Copy or download the unified diff', 'Both inputs auto-save']
+    },
+    'uuid': {
+      what: 'Generates cryptographically-strong UUIDs in bulk. Supports random (v4), time-ordered (v7) and the nil UUID, with formatting options.',
+      features: [
+        'Uses the browser CSPRNG (<code>crypto.getRandomValues</code>/<code>randomUUID</code>) — safe for real IDs.',
+        'v7 embeds a millisecond timestamp so IDs sort chronologically — great for database keys.',
+        'Formatting: uppercase, braces, or hyphen-free — applied without re-randomizing values.',
+        'Generate up to 500 at once; copy one, copy all, or download.'
+      ],
+      usage: [
+        'Pick a version (v4 / v7 / Nil) and a quantity.',
+        'Click <strong>Generate</strong>.',
+        'Copy individual values, Copy All, or Download as a text file.'
+      ],
+      shortcuts: ['<kbd>Enter</kbd> in the quantity box — generate'],
+      extras: ['Format toggles preserve the generated values']
+    },
+    'json-formatter': {
+      what: 'Pretty-prints, minifies and validates JSON. When JSON is invalid it pinpoints the exact line and column of the error so you can fix it fast.',
+      features: [
+        'Format with 2/4-space or tab indentation.',
+        'Minify to the smallest valid payload.',
+        'Validation reports precise <em>line : column</em> of syntax errors.',
+        'Optional recursive key sorting (arrays keep their order).',
+        'Stats: key count, nesting depth, and size before → after.'
+      ],
+      usage: [
+        'Paste JSON into the input.',
+        'Click <strong>Format</strong>, <strong>Minify</strong> or <strong>Validate</strong>.',
+        'Adjust indent or Sort keys — the output re-formats live.'
+      ],
+      shortcuts: ['<kbd>Ctrl/⌘</kbd> + <kbd>Enter</kbd> — format'],
+      extras: ['Drag &amp; drop a .json file', 'Copy or download the result', 'Input auto-saves']
+    }
+  };
+
+  (function () {
+    var T = window.Taste;
+    var el = T.el, $ = T.$;
+
+    fetch('data/tools.json', { cache: 'no-cache' })
+      .then(function (r) { return r.json(); })
+      .then(render)
+      .catch(function () {
+        $('#docBody').innerHTML = '<p class="doc-empty">Couldn’t load the tool registry. Make sure data/tools.json is present.</p>';
+      });
+
+    function badgeChips(badges) {
+      var map = { popular: ['badge-hot','bi-fire','Popular'], 'new': ['badge-new','bi-stars','New'], niche: ['badge-niche','bi-gem','Niche'] };
+      return (badges || []).filter(function (b){ return map[b]; }).map(function (b) {
+        var m = map[b];
+        return el('span', { class: 'badge-taste ' + m[0], title: m[2] }, [ el('i', { class: 'bi ' + m[1] }) ]);
+      });
+    }
+
+    function detailBlock(id) {
+      var d = DOCS[id];
+      if (!d) return null;
+      var wrap = el('div', { class: 'doc-detail' });
+
+      wrap.appendChild(el('h5', {}, [ el('i', { class: 'bi bi-info-circle' }), document.createTextNode('What it does') ]));
+      wrap.appendChild(el('p', { html: d.what, style: 'margin:0;color:var(--text)' }));
+
+      function section(title, icon, items, asHtml) {
+        if (!items || !items.length) return;
+        wrap.appendChild(el('h5', {}, [ el('i', { class: 'bi ' + icon }), document.createTextNode(title) ]));
+        var ul = el('ul', {});
+        items.forEach(function (it) { ul.appendChild(el('li', { html: it })); });
+        wrap.appendChild(ul);
+      }
+      section('Key features', 'bi-stars', d.features);
+      section('How to use', 'bi-play-circle', d.usage);
+      section('Keyboard shortcuts', 'bi-keyboard', d.shortcuts);
+      section('Extras', 'bi-plus-circle', d.extras);
+
+      return wrap;
+    }
+
+    function toolCard(tool, catName) {
+      var head = el('div', { class: 'doc-tool-head' }, [
+        el('div', { class: 'doc-tool-icon' }, [ el('i', { class: 'bi ' + (tool.icon || 'bi-tools') }) ]),
+        el('div', { class: 'doc-tool-headtext' }, [
+          el('h4', {}, [
+            document.createTextNode(tool.name),
+            el('span', { class: 'doc-status ' + (tool.status === 'ready' ? 'ready' : 'soon'),
+              text: tool.status === 'ready' ? 'Ready' : 'Coming soon' })
+          ].concat(badgeChips(tool.badges))),
+          el('p', { text: tool.desc || '' })
+        ])
+      ]);
+
+      var card = el('div', { class: 'doc-tool', dataset: { search: (tool.name + ' ' + (tool.desc||'') + ' ' + catName).toLowerCase() } }, [head]);
+
+      var detail = detailBlock(tool.id);
+      if (detail) card.appendChild(detail);
+
+      if (tool.status === 'ready') {
+        card.appendChild(el('a', { class: 'btn-taste btn-taste-primary btn-taste-sm doc-open-btn',
+          href: 'index.html#/' + tool.id }, [ el('i', { class: 'bi bi-box-arrow-up-right' }),
+          document.createTextNode(' Open tool') ]));
+      }
+      return card;
+    }
+
+    function render(data) {
+      var body = $('#docBody');
+      var toc = $('#tocList');
+      var hero = $('#heroStats');
+      body.innerHTML = ''; toc.innerHTML = '';
+
+      var cats = (data.categories || []).slice().sort(function (a,b){ return (a.order||0)-(b.order||0); });
+      var byCat = {};
+      (data.tools || []).forEach(function (t) { (byCat[t.category] = byCat[t.category] || []).push(t); });
+
+      // hero stats
+      var readyCount = (data.tools||[]).filter(function(t){return t.status==='ready';}).length;
+      [['bi-tools', (data.meta && data.meta.toolCount || (data.tools||[]).length) + ' tools'],
+       ['bi-check-circle', readyCount + ' ready'],
+       ['bi-collection', cats.length + ' categories'],
+       ['bi-shield-lock', '100% local']
+      ].forEach(function (s) {
+        hero.appendChild(el('span', { class: 'stat-chip' }, [
+          el('i', { class: 'bi ' + s[0] }),
+          el('strong', { text: String(s[1]).split(' ')[0] }),
+          document.createTextNode(' ' + s[1].split(' ').slice(1).join(' '))
+        ]));
+      });
+
+      cats.forEach(function (cat) {
+        var tools = byCat[cat.id] || [];
+        if (!tools.length) return;
+
+        // TOC entry
+        toc.appendChild(el('a', { href: '#cat-' + cat.id }, [
+          el('i', { class: 'bi ' + (cat.icon || 'bi-folder') }),
+          document.createTextNode(' ' + cat.name),
+          el('span', { class: 'count', text: String(tools.length) })
+        ]));
+
+        // Section
+        var section = el('section', { class: 'doc-cat', id: 'cat-' + cat.id });
+        section.appendChild(el('h3', { class: 'doc-cat-title' }, [
+          el('i', { class: 'bi ' + (cat.icon || 'bi-folder') }),
+          document.createTextNode(cat.name + ' '),
+          el('span', { class: 'count', text: '(' + tools.length + ')' })
+        ]));
+        tools.forEach(function (t) { section.appendChild(toolCard(t, cat.name)); });
+        body.appendChild(section);
+      });
+
+      wireSearch();
+    }
+
+    function wireSearch() {
+      var input = $('#docSearch');
+      var run = T.debounce(function (q) {
+        q = (q || '').trim().toLowerCase();
+        T.$$('.doc-tool').forEach(function (card) {
+          card.style.display = (!q || card.dataset.search.indexOf(q) !== -1) ? '' : 'none';
+        });
+        // hide empty category sections
+        T.$$('.doc-cat').forEach(function (sec) {
+          var any = T.$$('.doc-tool', sec).some(function (c){ return c.style.display !== 'none'; });
+          sec.style.display = any ? '' : 'none';
+        });
+      }, 120);
+      T.on(input, 'input', function (e) { run(e.target.value); });
+    }
+  })();
+  </script>
+</body>
+</html>

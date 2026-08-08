@@ -1,0 +1,259 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON Escape / Unescape - String Utilities</title>
+    <style>
+        :root {
+            --primary-color: #0284c7;
+            --primary-hover: #0369a1;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-color: #1e293b;
+            --border-color: #cbd5e1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 2rem 1rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        h1 {
+            color: #0f172a;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #64748b;
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .info-box {
+            background-color: #f0f9ff;
+            border-left: 4px solid var(--primary-color);
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 0 4px 4px 0;
+            font-size: 0.95rem;
+        }
+
+        .info-box ul {
+            margin-left: 1.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .textarea-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: #334155;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.9rem;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        textarea:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 130px;
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: #475569;
+        }
+
+        .btn-secondary:hover {
+            background-color: #cbd5e1;
+        }
+
+        .copy-btn {
+            background-color: #22c55e;
+            color: white;
+        }
+
+        .copy-btn:hover {
+            background-color: #16a34a;
+        }
+
+        .toast {
+            display: none;
+            text-align: center;
+            padding: 0.5rem;
+            background-color: #1e293b;
+            color: white;
+            border-radius: 4px;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>JSON Escape / Unescape</h1>
+        <p class="subtitle">String Escaper & Utilities for Postman and Developers</p>
+    </header>
+
+    <main class="card">
+        <div class="info-box">
+            <p>Escapes or unescapes a JSON string, removing traces of offending characters that could prevent parsing. The following characters are reserved in JSON and must be properly escaped to be used in strings:</p>
+            <ul>
+                <li>Backspace is replaced with <code>\b</code></li>
+                <li>Form feed is replaced with <code>\f</code></li>
+                <li>Newline is replaced with <code>\n</code></li>
+                <li>Carriage return is replaced with <code>\r</code></li>
+                <li>Tab is replaced with <code>\t</code></li>
+                <li>Double quote is replaced with <code>\"</code></li>
+                <li>Backslash is replaced with <code>\\</code></li>
+            </ul>
+        </div>
+
+        <div class="textarea-group">
+            <label for="inputString">Copy-paste the JSON to escape or unescape here:</label>
+            <textarea id="inputString" placeholder="Paste your raw JSON or escaped string here..."></textarea>
+        </div>
+
+        <div class="button-group">
+            <button class="btn-primary" onclick="escapeJSON()">Escape JSON</button>
+            <button class="btn-primary" onclick="unescapeJSON()">Unescape JSON</button>
+            <button class="btn-secondary" onclick="clearAll()">Clear</button>
+        </div>
+
+        <div class="textarea-group">
+            <label for="outputString">Result:</label>
+            <textarea id="outputString" readonly placeholder="Your result will appear here..."></textarea>
+        </div>
+
+        <button class="copy-btn" onclick="copyToClipboard()">Copy Result to Clipboard</button>
+        <div id="toast" class="toast">Copied to clipboard!</div>
+    </main>
+</div>
+
+<script>
+    function escapeJSON() {
+        const input = document.getElementById('inputString').value;
+        try {
+            // Use JSON.stringify to handle the core escaping mechanics natively and safely
+            const escaped = JSON.stringify(input);
+            // Slice off the wrapping start and end quotes added by stringify
+            document.getElementById('outputString').value = escaped.substring(1, escaped.length - 1);
+        } catch (e) {
+            document.getElementById('outputString').value = "Error escaping string: " + e.message;
+        }
+    }
+
+    function unescapeJSON() {
+        const input = document.getElementById('inputString').value;
+        try {
+            // Wrap in quotes to make it a valid JSON string token for parsing
+            const unescaped = JSON.parse('"' + input + '"');
+            document.getElementById('outputString').value = unescaped;
+        } catch (e) {
+            // Fallback manual approach if parsing a broken token fails
+            let manualUnescaped = input
+                .replace(/\\"/g, '"')
+                .replace(/\\\\/g, '\\')
+                .replace(/\\n/g, '\n')
+                .replace(/\\r/g, '\r')
+                .replace(/\\t/g, '\t')
+                .replace(/\\b/g, '\b')
+                .replace(/\\f/g, '\f');
+            document.getElementById('outputString').value = manualUnescaped;
+        }
+    }
+
+    function clearAll() {
+        document.getElementById('inputString').value = '';
+        document.getElementById('outputString').value = '';
+    }
+
+    function copyToClipboard() {
+        const output = document.getElementById('outputString');
+        if (!output.value) return;
+        
+        output.select();
+        output.setSelectionRange(0, 99999); /* For mobile devices */
+        navigator.clipboard.writeText(output.value);
+
+        const toast = document.getElementById('toast');
+        toast.style.display = 'block';
+        setTimeout(() => {
+            toast.style.display = 'none';
+        }, 2000);
+    }
+</script>
+
+</body>
+</html>
