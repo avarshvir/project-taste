@@ -1,0 +1,1420 @@
+{
+  "meta": {
+    "name": "Project Taste",
+    "tagline": "A little taste of the perfect toolkit.",
+    "version": "0.1.0",
+    "toolCount": 127,
+    "categoryCount": 17
+  },
+  "categories": [
+    {
+      "id": "text",
+      "name": "Text & String",
+      "icon": "bi-fonts",
+      "order": 0
+    },
+    {
+      "id": "json",
+      "name": "JSON",
+      "icon": "bi-braces",
+      "order": 1
+    },
+    {
+      "id": "data",
+      "name": "Data & Config",
+      "icon": "bi-filetype-yml",
+      "order": 2
+    },
+    {
+      "id": "encoding",
+      "name": "Encoding",
+      "icon": "bi-shield-lock",
+      "order": 3
+    },
+    {
+      "id": "crypto",
+      "name": "Crypto & Keys",
+      "icon": "bi-key",
+      "order": 4
+    },
+    {
+      "id": "hashing",
+      "name": "Hashing",
+      "icon": "bi-hash",
+      "order": 5
+    },
+    {
+      "id": "generators",
+      "name": "Generators",
+      "icon": "bi-magic",
+      "order": 6
+    },
+    {
+      "id": "web",
+      "name": "Web / CSS",
+      "icon": "bi-code-slash",
+      "order": 7
+    },
+    {
+      "id": "colors",
+      "name": "Colors",
+      "icon": "bi-palette",
+      "order": 8
+    },
+    {
+      "id": "markdown",
+      "name": "Markdown",
+      "icon": "bi-markdown",
+      "order": 9
+    },
+    {
+      "id": "images",
+      "name": "Images",
+      "icon": "bi-image",
+      "order": 10
+    },
+    {
+      "id": "datetime",
+      "name": "Date & Time",
+      "icon": "bi-clock-history",
+      "order": 11
+    },
+    {
+      "id": "regex",
+      "name": "Regex",
+      "icon": "bi-regex",
+      "order": 12
+    },
+    {
+      "id": "networking",
+      "name": "Networking",
+      "icon": "bi-hdd-network",
+      "order": 13
+    },
+    {
+      "id": "devops",
+      "name": "DevOps",
+      "icon": "bi-gear-wide-connected",
+      "order": 14
+    },
+    {
+      "id": "diagrams",
+      "name": "Diagrams",
+      "icon": "bi-diagram-3",
+      "order": 15
+    },
+    {
+      "id": "ai",
+      "name": "AI",
+      "icon": "bi-robot",
+      "order": 16
+    }
+  ],
+  "tools": [
+    {
+      "id": "text-diff",
+      "name": "Text Diff",
+      "category": "text",
+      "icon": "bi-file-diff",
+      "desc": "Compare two texts and highlight differences.",
+      "badges": [
+        "popular"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "case-converter",
+      "name": "Case Converter",
+      "category": "text",
+      "icon": "bi-type",
+      "desc": "Convert to UPPER, lower, Title, camelCase, snake_case.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "remove-duplicate-lines",
+      "name": "Remove Duplicate Lines",
+      "category": "text",
+      "icon": "bi-recycle",
+      "desc": "Strip repeated lines, keep unique ones.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "remove-empty-lines",
+      "name": "Remove Empty Lines",
+      "category": "text",
+      "icon": "bi-file-earmark-minus",
+      "desc": "Delete blank lines from any text block.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "reverse-text",
+      "name": "Reverse Text",
+      "category": "text",
+      "icon": "bi-arrow-left-right",
+      "desc": "Reverse characters, words, or line order.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "sort-lines",
+      "name": "Sort Lines",
+      "category": "text",
+      "icon": "bi-sort-alpha-down",
+      "desc": "Alphabetical / numeric / reverse line sorting.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "word-counter",
+      "name": "Word Counter",
+      "category": "text",
+      "icon": "bi-123",
+      "desc": "Count words, sentences & reading time.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "character-counter",
+      "name": "Character Counter",
+      "category": "text",
+      "icon": "bi-fonts",
+      "desc": "Live character, byte & whitespace counts.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "slug-generator",
+      "name": "Slug Generator",
+      "category": "text",
+      "icon": "bi-link",
+      "desc": "Turn any string into a clean URL slug.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "random-text-generator",
+      "name": "Random Text Generator",
+      "category": "text",
+      "icon": "bi-shuffle",
+      "desc": "Generate random words, sentences or gibberish.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "json-formatter",
+      "name": "JSON Formatter",
+      "category": "json",
+      "icon": "bi-braces-asterisk",
+      "desc": "Pretty-print & indent messy JSON.",
+      "badges": [
+        "popular"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "json-validator",
+      "name": "JSON Validator",
+      "category": "json",
+      "icon": "bi-check2-circle",
+      "desc": "Validate JSON and pinpoint syntax errors.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "json-escape-unescape",
+      "name": "JSON Escape / Unescape",
+      "category": "json",
+      "icon": "bi-braces",
+      "desc": "Escape & unescape JSON strings for Postman & APIs.",
+      "badges": [
+        "popular"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "json-pretty-print",
+      "name": "JSON Pretty Print",
+      "category": "json",
+      "icon": "bi-text-indent-left",
+      "desc": "Human-readable, indented JSON view.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "json-minify",
+      "name": "JSON Minify",
+      "category": "json",
+      "icon": "bi-arrows-collapse",
+      "desc": "Strip whitespace to shrink JSON payloads.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "json-compare",
+      "name": "JSON Compare",
+      "category": "json",
+      "icon": "bi-columns-gap",
+      "desc": "Diff two JSON objects structurally.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "json-to-csv",
+      "name": "JSON to CSV",
+      "category": "json",
+      "icon": "bi-filetype-csv",
+      "desc": "Flatten JSON arrays into CSV tables.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "json-to-yaml",
+      "name": "JSON to YAML",
+      "category": "json",
+      "icon": "bi-filetype-yml",
+      "desc": "Convert JSON documents to YAML.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "json-path",
+      "name": "JSON Path",
+      "category": "json",
+      "icon": "bi-diagram-2",
+      "desc": "Query JSON with JSONPath expressions.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "xml-formatter",
+      "name": "XML Formatter",
+      "category": "data",
+      "icon": "bi-filetype-xml",
+      "desc": "Beautify & validate XML documents.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "yaml-validator",
+      "name": "YAML Validator",
+      "category": "data",
+      "icon": "bi-filetype-yml",
+      "desc": "Validate YAML and surface indentation errors.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "toml-formatter",
+      "name": "TOML Formatter",
+      "category": "data",
+      "icon": "bi-filetype-txt",
+      "desc": "Format & tidy TOML config files.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "csv-viewer",
+      "name": "CSV Viewer",
+      "category": "data",
+      "icon": "bi-table",
+      "desc": "View & sort CSV data in a clean grid.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "sql-formatter",
+      "name": "SQL Formatter",
+      "category": "data",
+      "icon": "bi-database-gear",
+      "desc": "Beautify SQL queries with proper indentation.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "sql-query-formatter",
+      "name": "SQL Query Formatter",
+      "category": "data",
+      "icon": "bi-database-check",
+      "desc": "Advanced multi-dialect SQL pretty-printer.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "sql-to-json",
+      "name": "SQL to JSON",
+      "category": "data",
+      "icon": "bi-database-fill-up",
+      "desc": "Convert SQL result sets into JSON.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "sql-explain-visualizer",
+      "name": "SQL Explain Visualizer",
+      "category": "data",
+      "icon": "bi-diagram-3",
+      "desc": "Visualize SQL EXPLAIN query plans.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "base64",
+      "name": "Base64",
+      "category": "encoding",
+      "icon": "bi-file-binary",
+      "desc": "Encode & decode text and images to Base64.",
+      "badges": [
+        "popular"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "url-encode",
+      "name": "URL Encode",
+      "category": "encoding",
+      "icon": "bi-link-45deg",
+      "desc": "Percent-encode & decode URL components.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "html-encode",
+      "name": "HTML Encode",
+      "category": "encoding",
+      "icon": "bi-code",
+      "desc": "Escape & unescape HTML entities.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "unicode",
+      "name": "Unicode",
+      "category": "encoding",
+      "icon": "bi-translate",
+      "desc": "Inspect, escape & unescape Unicode code points.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "jwt-decoder",
+      "name": "JWT Decoder",
+      "category": "encoding",
+      "icon": "bi-key",
+      "desc": "Decode header, payload & signature of a JWT.",
+      "badges": [
+        "popular"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "jwt-generator",
+      "name": "JWT Generator",
+      "category": "encoding",
+      "icon": "bi-key-fill",
+      "desc": "Build & sign JWTs with custom claims.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "jwt-inspector",
+      "name": "JWT Inspector",
+      "category": "encoding",
+      "icon": "bi-search",
+      "desc": "Deep-inspect JWT claims & algorithm.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "jwt-expiry-calculator",
+      "name": "JWT Expiry Calculator",
+      "category": "encoding",
+      "icon": "bi-hourglass-split",
+      "desc": "Check when a JWT expires & time remaining.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "jwt-payload-editor",
+      "name": "JWT Payload Editor",
+      "category": "encoding",
+      "icon": "bi-pencil-square",
+      "desc": "Edit JWT payload & re-encode instantly.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "pem-key-viewer",
+      "name": "PEM Key Viewer",
+      "category": "crypto",
+      "icon": "bi-file-lock",
+      "desc": "Inspect PEM certificates & key details.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "ssh-key-generator",
+      "name": "SSH Key Generator",
+      "category": "crypto",
+      "icon": "bi-terminal-fill",
+      "desc": "Generate SSH key pairs in the browser.",
+      "badges": [
+        "niche"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "md5",
+      "name": "MD5",
+      "category": "hashing",
+      "icon": "bi-hash",
+      "desc": "Compute MD5 digests of text or files.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "sha1",
+      "name": "SHA1",
+      "category": "hashing",
+      "icon": "bi-hash",
+      "desc": "Compute SHA-1 hashes.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "sha256",
+      "name": "SHA256",
+      "category": "hashing",
+      "icon": "bi-hash",
+      "desc": "Compute SHA-256 hashes.",
+      "badges": [
+        "popular"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "sha512",
+      "name": "SHA512",
+      "category": "hashing",
+      "icon": "bi-hash",
+      "desc": "Compute SHA-512 hashes.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "crc32",
+      "name": "CRC32",
+      "category": "hashing",
+      "icon": "bi-hash",
+      "desc": "Compute CRC32 checksums.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "hmac-generator",
+      "name": "HMAC Generator",
+      "category": "hashing",
+      "icon": "bi-shield-check",
+      "desc": "Generate keyed HMAC signatures.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "uuid",
+      "name": "UUID",
+      "category": "generators",
+      "icon": "bi-fingerprint",
+      "desc": "Generate v4 UUIDs in bulk.",
+      "badges": [
+        "popular"
+      ],
+      "status": "ready"
+    },
+    {
+      "id": "uuid-inspector",
+      "name": "UUID Inspector",
+      "category": "generators",
+      "icon": "bi-search",
+      "desc": "Decode version & variant from a UUID.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "nano-id",
+      "name": "Nano ID",
+      "category": "generators",
+      "icon": "bi-dot",
+      "desc": "Generate compact, URL-safe Nano IDs.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "password",
+      "name": "Password",
+      "category": "generators",
+      "icon": "bi-lock",
+      "desc": "Generate strong, customizable passwords.",
+      "badges": [],
+      "status": "ready"
+    },
+    {
+      "id": "api-key",
+      "name": "API Key",
+      "category": "generators",
+      "icon": "bi-key-fill",
+      "desc": "Generate secure random API keys.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "random-number",
+      "name": "Random Number",
+      "category": "generators",
+      "icon": "bi-dice-5",
+      "desc": "Generate random numbers in a range.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "fake-user",
+      "name": "Fake User",
+      "category": "generators",
+      "icon": "bi-person-badge",
+      "desc": "Generate realistic fake user profiles.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "lorem-ipsum",
+      "name": "Lorem Ipsum",
+      "category": "generators",
+      "icon": "bi-text-paragraph",
+      "desc": "Classic placeholder text generator.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "color-palette",
+      "name": "Color Palette",
+      "category": "generators",
+      "icon": "bi-palette2",
+      "desc": "Generate harmonious color palettes.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "dot-env-generator",
+      "name": ".env Generator",
+      "category": "generators",
+      "icon": "bi-file-earmark-code",
+      "desc": "Scaffold .env files from key/value pairs.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "html-formatter",
+      "name": "HTML Formatter",
+      "category": "web",
+      "icon": "bi-filetype-html",
+      "desc": "Beautify & indent HTML markup.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "css-beautifier",
+      "name": "CSS Beautifier",
+      "category": "web",
+      "icon": "bi-filetype-css",
+      "desc": "Format & tidy CSS code.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "js-beautifier",
+      "name": "JS Beautifier",
+      "category": "web",
+      "icon": "bi-filetype-js",
+      "desc": "Beautify minified JavaScript.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "css-minifier",
+      "name": "CSS Minifier",
+      "category": "web",
+      "icon": "bi-arrows-collapse",
+      "desc": "Minify CSS to reduce file size.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "js-minifier",
+      "name": "JS Minifier",
+      "category": "web",
+      "icon": "bi-arrows-collapse",
+      "desc": "Minify JavaScript for production.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "html-minifier",
+      "name": "HTML Minifier",
+      "category": "web",
+      "icon": "bi-arrows-collapse",
+      "desc": "Compress HTML markup.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "css-grid-generator",
+      "name": "CSS Grid Generator",
+      "category": "web",
+      "icon": "bi-grid-3x3",
+      "desc": "Visually build CSS grid layouts.",
+      "badges": [
+        "popular"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "flexbox-generator",
+      "name": "Flexbox Generator",
+      "category": "web",
+      "icon": "bi-distribute-horizontal",
+      "desc": "Generate flexbox layouts visually.",
+      "badges": [
+        "popular"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "graphql-query-beautifier",
+      "name": "GraphQL Query Beautifier",
+      "category": "web",
+      "icon": "bi-diagram-2",
+      "desc": "Format & indent GraphQL queries.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "css-variable-extractor",
+      "name": "CSS Variable Extractor",
+      "category": "web",
+      "icon": "bi-eyedropper",
+      "desc": "Extract CSS custom properties from code.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "css-clamp-generator",
+      "name": "CSS Clamp Generator",
+      "category": "web",
+      "icon": "bi-arrows-angle-expand",
+      "desc": "Build fluid responsive clamp() values.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "tailwind-playground",
+      "name": "Tailwind Playground",
+      "category": "web",
+      "icon": "bi-wind",
+      "desc": "Live Tailwind utility class playground.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "hex-to-rgb",
+      "name": "HEX ↔ RGB",
+      "category": "colors",
+      "icon": "bi-palette",
+      "desc": "Convert between HEX, RGB & HSL.",
+      "badges": [
+        "popular"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "gradient-generator",
+      "name": "Gradient Generator",
+      "category": "colors",
+      "icon": "bi-paint-bucket",
+      "desc": "Craft CSS linear & radial gradients.",
+      "badges": [
+        "popular"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "shadow-generator",
+      "name": "Shadow Generator",
+      "category": "colors",
+      "icon": "bi-square",
+      "desc": "Design box-shadow & text-shadow.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "glassmorphism-generator",
+      "name": "Glassmorphism Generator",
+      "category": "colors",
+      "icon": "bi-front",
+      "desc": "Generate frosted-glass CSS effects.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "neumorphism-generator",
+      "name": "Neumorphism Generator",
+      "category": "colors",
+      "icon": "bi-square-half",
+      "desc": "Generate soft neumorphic shadows.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "tailwind-color-picker",
+      "name": "Tailwind Color Picker",
+      "category": "colors",
+      "icon": "bi-eyedropper",
+      "desc": "Pick & copy Tailwind palette colors.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "color-blindness-preview",
+      "name": "Color Blindness Preview",
+      "category": "colors",
+      "icon": "bi-eye",
+      "desc": "Simulate color-blindness on your palette.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "accessibility-contrast-checker",
+      "name": "Accessibility Contrast Checker",
+      "category": "colors",
+      "icon": "bi-universal-access",
+      "desc": "Check WCAG contrast ratios.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "markdown-preview",
+      "name": "Markdown Preview",
+      "category": "markdown",
+      "icon": "bi-markdown",
+      "desc": "Live-render Markdown as you type.",
+      "badges": [
+        "popular"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "markdown-to-html",
+      "name": "Markdown to HTML",
+      "category": "markdown",
+      "icon": "bi-filetype-html",
+      "desc": "Convert Markdown to clean HTML.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "html-to-markdown",
+      "name": "HTML to Markdown",
+      "category": "markdown",
+      "icon": "bi-markdown-fill",
+      "desc": "Convert HTML back into Markdown.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "svg-optimizer",
+      "name": "SVG Optimizer",
+      "category": "images",
+      "icon": "bi-vector-pen",
+      "desc": "Shrink & clean SVG source.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "svg-preview",
+      "name": "SVG Preview",
+      "category": "images",
+      "icon": "bi-image",
+      "desc": "Preview raw SVG markup live.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "base64-image",
+      "name": "Base64 Image",
+      "category": "images",
+      "icon": "bi-file-image",
+      "desc": "Encode images to Base64 data URIs.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "image-resize",
+      "name": "Image Resize",
+      "category": "images",
+      "icon": "bi-aspect-ratio",
+      "desc": "Resize & compress images client-side.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "qr-generator",
+      "name": "QR Generator",
+      "category": "images",
+      "icon": "bi-qr-code",
+      "desc": "Generate QR codes from text or URLs.",
+      "badges": [
+        "popular"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "qr-scanner",
+      "name": "QR Scanner",
+      "category": "images",
+      "icon": "bi-qr-code-scan",
+      "desc": "Scan QR codes via camera or upload.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "favicon-generator",
+      "name": "Favicon Generator",
+      "category": "images",
+      "icon": "bi-star",
+      "desc": "Create favicons in all needed sizes.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "svg-sprite-generator",
+      "name": "SVG Sprite Generator",
+      "category": "images",
+      "icon": "bi-collection",
+      "desc": "Combine SVGs into a single sprite sheet.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "unix-timestamp",
+      "name": "Unix Timestamp",
+      "category": "datetime",
+      "icon": "bi-clock",
+      "desc": "Convert Unix time ↔ human date.",
+      "badges": [
+        "popular"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "cron-generator",
+      "name": "Cron Generator",
+      "category": "datetime",
+      "icon": "bi-clock-history",
+      "desc": "Build cron expressions visually.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "cron-parser",
+      "name": "Cron Parser",
+      "category": "datetime",
+      "icon": "bi-calendar-check",
+      "desc": "Explain cron schedules in plain English.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "time-zone-converter",
+      "name": "Time Zone Converter",
+      "category": "datetime",
+      "icon": "bi-globe",
+      "desc": "Convert times across time zones.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "regex-tester",
+      "name": "Regex Tester",
+      "category": "regex",
+      "icon": "bi-regex",
+      "desc": "Test regex with live match highlighting.",
+      "badges": [
+        "popular"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "regex-generator",
+      "name": "Regex Generator",
+      "category": "regex",
+      "icon": "bi-magic",
+      "desc": "Describe intent, get a regex pattern.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "regex-cheat-sheet",
+      "name": "Regex Cheat Sheet",
+      "category": "regex",
+      "icon": "bi-card-list",
+      "desc": "Handy reference for regex syntax.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "url-parser",
+      "name": "URL Parser",
+      "category": "networking",
+      "icon": "bi-link-45deg",
+      "desc": "Break a URL into its components.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "http-header-viewer",
+      "name": "HTTP Header Viewer",
+      "category": "networking",
+      "icon": "bi-list-columns",
+      "desc": "Inspect & explain HTTP headers.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "mime-finder",
+      "name": "MIME Finder",
+      "category": "networking",
+      "icon": "bi-filetype-doc",
+      "desc": "Look up MIME types by extension.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "http-status-lookup",
+      "name": "HTTP Status Lookup",
+      "category": "networking",
+      "icon": "bi-signpost-split",
+      "desc": "Explain any HTTP status code.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "curl-to-fetch-converter",
+      "name": "Curl to Fetch Converter",
+      "category": "networking",
+      "icon": "bi-arrow-repeat",
+      "desc": "Convert curl commands to JS fetch().",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "curl-to-axios-converter",
+      "name": "Curl to Axios Converter",
+      "category": "networking",
+      "icon": "bi-arrow-repeat",
+      "desc": "Convert curl commands to Axios calls.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "api-response-viewer",
+      "name": "API Response Viewer",
+      "category": "networking",
+      "icon": "bi-braces",
+      "desc": "Pretty-view & explore API responses.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "http-request-builder",
+      "name": "HTTP Request Builder",
+      "category": "networking",
+      "icon": "bi-hammer",
+      "desc": "Compose & preview HTTP requests.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "cookie-parser",
+      "name": "Cookie Parser",
+      "category": "networking",
+      "icon": "bi-cookie",
+      "desc": "Parse & inspect cookie strings.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "user-agent-analyzer",
+      "name": "User Agent Analyzer",
+      "category": "networking",
+      "icon": "bi-window",
+      "desc": "Break down any User-Agent string.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "ip-cidr-calculator",
+      "name": "IP CIDR Calculator",
+      "category": "networking",
+      "icon": "bi-diagram-3",
+      "desc": "Calculate subnets & ranges from CIDR.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "ipv6-helper",
+      "name": "IPv6 Helper",
+      "category": "networking",
+      "icon": "bi-hdd-network",
+      "desc": "Expand, compress & validate IPv6.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "docker-cheat-sheet",
+      "name": "Docker Cheat Sheet",
+      "category": "devops",
+      "icon": "bi-box",
+      "desc": "Essential Docker commands reference.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "git-cheat-sheet",
+      "name": "Git Cheat Sheet",
+      "category": "devops",
+      "icon": "bi-git",
+      "desc": "Common Git commands & workflows.",
+      "badges": [
+        "popular"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "kubernetes-cheat-sheet",
+      "name": "Kubernetes Cheat Sheet",
+      "category": "devops",
+      "icon": "bi-diagram-3",
+      "desc": "Handy kubectl command reference.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "http-status-codes",
+      "name": "HTTP Status Codes",
+      "category": "devops",
+      "icon": "bi-signpost",
+      "desc": "Full HTTP status code reference.",
+      "badges": [],
+      "status": "soon"
+    },
+    {
+      "id": "postman-environment-generator",
+      "name": "Postman Environment Generator",
+      "category": "devops",
+      "icon": "bi-collection",
+      "desc": "Generate Postman environment JSON.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "openapi-viewer",
+      "name": "OpenAPI Viewer",
+      "category": "devops",
+      "icon": "bi-file-earmark-text",
+      "desc": "Render & browse OpenAPI/Swagger specs.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "kubernetes-yaml-validator",
+      "name": "Kubernetes YAML Validator",
+      "category": "devops",
+      "icon": "bi-check2-square",
+      "desc": "Validate K8s manifests.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "docker-compose-formatter",
+      "name": "Docker Compose Formatter",
+      "category": "devops",
+      "icon": "bi-boxes",
+      "desc": "Format & lint docker-compose files.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "terraform-formatter",
+      "name": "Terraform Formatter",
+      "category": "devops",
+      "icon": "bi-hdd-stack",
+      "desc": "Format HCL Terraform configs.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "nginx-config-formatter",
+      "name": "Nginx Config Formatter",
+      "category": "devops",
+      "icon": "bi-server",
+      "desc": "Beautify nginx configuration files.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "apache-config-formatter",
+      "name": "Apache Config Formatter",
+      "category": "devops",
+      "icon": "bi-server",
+      "desc": "Format Apache httpd configs.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "log-beautifier",
+      "name": "Log Beautifier",
+      "category": "devops",
+      "icon": "bi-journal-code",
+      "desc": "Structure & colorize raw log output.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "stack-trace-cleaner",
+      "name": "Stack Trace Cleaner",
+      "category": "devops",
+      "icon": "bi-bug",
+      "desc": "Trim noise from stack traces.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "gitignore-generator",
+      "name": "Gitignore Generator",
+      "category": "devops",
+      "icon": "bi-git",
+      "desc": "Build .gitignore from templates.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "license-generator",
+      "name": "License Generator",
+      "category": "devops",
+      "icon": "bi-file-earmark-check",
+      "desc": "Generate open-source LICENSE files.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "semantic-version-comparator",
+      "name": "Semantic Version Comparator",
+      "category": "devops",
+      "icon": "bi-sort-numeric-down",
+      "desc": "Compare & sort semver versions.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "changelog-generator",
+      "name": "Changelog Generator",
+      "category": "devops",
+      "icon": "bi-list-stars",
+      "desc": "Generate changelogs from commits.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "commit-message-generator",
+      "name": "Commit Message Generator",
+      "category": "devops",
+      "icon": "bi-chat-left-text",
+      "desc": "Craft clean commit messages.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "conventional-commit-helper",
+      "name": "Conventional Commit Helper",
+      "category": "devops",
+      "icon": "bi-check-circle",
+      "desc": "Build Conventional Commits interactively.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "mermaid-live-preview",
+      "name": "Mermaid Live Preview",
+      "category": "diagrams",
+      "icon": "bi-diagram-2",
+      "desc": "Render Mermaid diagrams live.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "plantuml-preview",
+      "name": "PlantUML Preview",
+      "category": "diagrams",
+      "icon": "bi-diagram-3",
+      "desc": "Render PlantUML diagrams live.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "ai-prompt-formatter",
+      "name": "AI Prompt Formatter",
+      "category": "ai",
+      "icon": "bi-robot",
+      "desc": "Structure & clean up LLM prompts.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    },
+    {
+      "id": "prompt-token-estimator",
+      "name": "Prompt Token Estimator",
+      "category": "ai",
+      "icon": "bi-calculator",
+      "desc": "Estimate token counts for prompts.",
+      "badges": [
+        "niche"
+      ],
+      "status": "soon"
+    }
+  ]
+}
