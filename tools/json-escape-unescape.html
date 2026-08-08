@@ -1,0 +1,198 @@
+<!-- =========================================================================
+     Project Taste — tools/json-escape-unescape.html
+     JSON Escape / Unescape.  Reference template for all tool pages.
+
+     This file is a MARKUP FRAGMENT (no <html>/<head>) that router.js injects
+     into the content area. It follows the TasteTools contract:
+
+         window.TasteTools['<tool-id>'] = function (root, tool, Taste) { ... }
+
+     After injection the router re-executes this <script> and calls the init
+     function with:
+        root  → the mounted container element (scope all queries to this)
+        tool  → the registry entry from data/tools.json
+        Taste → the global helper namespace (utils.js)
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-braces"></i></div>
+  <div class="tool-header-text">
+    <h1>JSON Escape / Unescape</h1>
+    <p>Escape or unescape JSON strings for Postman, configs, logs &amp; APIs — all in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="info-box">
+    These characters are reserved in JSON strings and must be escaped:
+    <ul>
+      <li>Double quote → <code>\"</code>, Backslash → <code>\\</code></li>
+      <li>Newline → <code>\n</code>, Carriage return → <code>\r</code>, Tab → <code>\t</code></li>
+      <li>Backspace → <code>\b</code>, Form feed → <code>\f</code></li>
+    </ul>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="je-input">Input <span class="field-hint">(paste raw text or an escaped string — drag &amp; drop a file too)</span></label>
+    <textarea id="je-input" class="textarea-taste" placeholder="Paste your raw JSON / string here…" spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="escape">
+      <i class="bi bi-arrow-right-square"></i> Escape
+    </button>
+    <button class="btn-taste btn-taste-primary" data-act="unescape">
+      <i class="bi bi-arrow-left-square"></i> Unescape
+    </button>
+    <button class="btn-taste btn-taste-secondary" data-act="swap" title="Move result into input">
+      <i class="bi bi-arrow-down-up"></i> Swap
+    </button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample">
+      <i class="bi bi-magic"></i> Sample
+    </button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear">
+      <i class="bi bi-x-circle"></i> Clear
+    </button>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="je-output">
+      Result
+      <span class="field-hint" id="je-meta"></span>
+    </label>
+    <textarea id="je-output" class="textarea-taste" placeholder="Your result appears here…" readonly spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy">
+      <i class="bi bi-clipboard-check"></i> Copy Result
+    </button>
+    <button class="btn-taste btn-taste-secondary" data-act="download">
+      <i class="bi bi-download"></i> Download
+    </button>
+  </div>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['json-escape-unescape'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$;
+
+    // Scope every query to `root` so multiple mounts never collide
+    var input   = $('#je-input', root);
+    var output  = $('#je-output', root);
+    var metaEl  = $('#je-meta', root);
+    var SAVE_KEY = 'tool:json-escape:input';
+
+    /* ---- Core logic (kept identical in behavior to your original) ---- */
+
+    // Escape: use JSON.stringify then strip the wrapping quotes it adds.
+    function escapeJSON(str) {
+      var s = JSON.stringify(str);        // safely handles all reserved chars
+      return s.substring(1, s.length - 1);
+    }
+
+    // Unescape: parse as a JSON string token, with a manual fallback.
+    function unescapeJSON(str) {
+      try {
+        return JSON.parse('"' + str + '"');
+      } catch (e) {
+        return str
+          .replace(/\\"/g, '"')
+          .replace(/\\\\/g, '\\')
+          .replace(/\\n/g, '\n')
+          .replace(/\\r/g, '\r')
+          .replace(/\\t/g, '\t')
+          .replace(/\\b/g, '\b')
+          .replace(/\\f/g, '\f');
+      }
+    }
+
+    /* ---- UI helpers ---- */
+
+    function setOutput(text, isError) {
+      output.value = text;
+      output.style.color = isError ? 'var(--danger)' : '';
+      updateMeta(isError ? '' : text);
+    }
+
+    function updateMeta(text) {
+      if (!text) { metaEl.textContent = ''; return; }
+      var chars = text.length;
+      var bytes = new Blob([text]).size;
+      metaEl.textContent = chars + ' chars · ' + Taste.bytes(bytes);
+    }
+
+    function run(mode) {
+      var value = input.value;
+      if (!value) { setOutput('', false); Taste.toast('Nothing to process', 'info'); return; }
+      try {
+        setOutput(mode === 'escape' ? escapeJSON(value) : unescapeJSON(value), false);
+      } catch (err) {
+        setOutput('Error: ' + err.message, true);
+        Taste.toast('Could not ' + mode + ' — check your input', 'error');
+      }
+    }
+
+    /* ---- Actions (delegated by data-act) ---- */
+    var actions = {
+      escape:  function () { run('escape'); },
+      unescape:function () { run('unescape'); },
+      swap:    function () {
+        if (!output.value) { Taste.toast('No result to swap', 'info'); return; }
+        input.value = output.value;
+        setOutput('', false);
+        autosave();
+      },
+      sample:  function () {
+        input.value = 'Hello "World"!\nLine two\tTabbed — path: C:\\dev\\taste';
+        run('escape');
+        autosave();
+      },
+      clear:   function () {
+        input.value = '';
+        setOutput('', false);
+        Taste.store.remove(SAVE_KEY);
+      },
+      copy:    function () { Taste.copy(output.value); },
+      download:function () {
+        if (!output.value) { Taste.toast('Nothing to download', 'info'); return; }
+        Taste.download('taste-json-output.txt', output.value, 'text/plain');
+      }
+    };
+
+    Taste.on(root, 'click', '[data-act]', function (e, node) {
+      var fn = actions[node.dataset.act];
+      if (fn) fn();
+    });
+
+    /* ---- Auto-save input (📥 auto-save feature) ---- */
+    var autosave = Taste.debounce(function () {
+      Taste.store.set(SAVE_KEY, input.value);
+    }, 400);
+    Taste.on(input, 'input', autosave);
+
+    // Restore any previously saved input
+    var saved = Taste.store.get(SAVE_KEY, '');
+    if (saved) input.value = saved;
+
+    /* ---- Drag & drop a text file onto the input ---- */
+    Taste.dropzone(input, function (text) {
+      input.value = text;
+      autosave();
+      Taste.toast('File loaded', 'success');
+    });
+
+    /* ---- Keyboard: Ctrl/⌘ + Enter escapes quickly ---- */
+    Taste.on(input, 'keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        run('escape');
+      }
+    });
+
+    // Focus the input for immediate typing
+    input.focus();
+  };
+</script>

@@ -1,0 +1,166 @@
+<!-- =========================================================================
+     Project Taste — tools/yaml-validator.html
+     Validate YAML (indentation-based subset) and preview as JSON.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['yaml-validator'] = function(root,tool,Taste){}
+
+     A dependency-free validator for the common YAML subset: mappings,
+     sequences, scalars, comments, and nested indentation. It surfaces the
+     offending line for common mistakes (tabs, bad indentation, missing
+     colon) and previews the parsed structure as JSON.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-filetype-yml"></i></div>
+  <div class="tool-header-text">
+    <h1>YAML Validator</h1>
+    <p>Validate YAML and preview the parsed structure as JSON — with line-level error hints for tabs and indentation. Runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="yv-input">YAML <span class="field-hint">(paste or drag &amp; drop a .yml file)</span></label>
+      <textarea id="yv-input" class="textarea-taste" placeholder="name: Taste&#10;tags:&#10;  - dev&#10;  - utils" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="yv-output">Parsed (JSON) <span class="field-hint" id="yv-meta"></span></label>
+      <textarea id="yv-output" class="textarea-taste" placeholder="Parsed JSON preview appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div id="yv-status" class="jx-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="validate"><i class="bi bi-check2-circle"></i> Validate</button>
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy JSON</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download .json</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="samplebad"><i class="bi bi-bug"></i> Broken</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .jx-status.ok  { background:var(--badge-new-bg); color:var(--badge-new-text); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['yaml-validator'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#yv-input',root), output=$('#yv-output',root), meta=$('#yv-meta',root), statusEl=$('#yv-status',root);
+    var SAVE='tool:yaml-validator:input';
+
+    function parseScalar(t){
+      if (t==='') return null;
+      if ((t[0]==='"'&&t.slice(-1)==='"')) { try{ return JSON.parse(t); }catch(e){ return t.slice(1,-1); } }
+      if ((t[0]==="'"&&t.slice(-1)==="'")) return t.slice(1,-1);
+      if (/^(true|yes|on)$/i.test(t)) return true;
+      if (/^(false|no|off)$/i.test(t)) return false;
+      if (/^(null|~)$/i.test(t)) return null;
+      if (/^-?\d+$/.test(t)) return parseInt(t,10);
+      if (/^-?\d*\.\d+([eE][-+]?\d+)?$/.test(t)) return parseFloat(t);
+      if (t[0]==='['||t[0]==='{'){ try{ return JSON.parse(t); }catch(e){} }
+      return t;
+    }
+
+    // Returns parsed object OR throws { message, line }
+    function parseYaml(text){
+      var rawLines=text.split('\n');
+      var root={}, stack=[{indent:-1, container:root, isArray:false}];
+
+      for (var idx=0; idx<rawLines.length; idx++){
+        var line=rawLines[idx];
+        if (line.trim()===''||line.trim()[0]==='#') continue;
+        if (/^\s*\t/.test(line)) { var e=new Error('Tabs are not allowed for indentation (use spaces).'); e.line=idx+1; throw e; }
+
+        var indent=line.match(/^ */)[0].length;
+        var content=line.slice(indent);
+
+        while (stack.length>1 && indent<=stack[stack.length-1].indent) stack.pop();
+        var top=stack[stack.length-1];
+        var parent=top.container;
+
+        if (content[0]==='-'){
+          var val=content.slice(1).trim();
+          if (!Array.isArray(parent)){
+            if (top.lastKey!==undefined && top.container[top.lastKey] && Array.isArray(top.container[top.lastKey])){
+              parent=top.container[top.lastKey];
+            } else if (top.lastKey!==undefined){
+              parent=top.container[top.lastKey]=[];
+            } else {
+              var e2=new Error('Sequence item found where a mapping was expected.'); e2.line=idx+1; throw e2;
+            }
+          }
+          if (val.indexOf(':')!==-1 && !/^["'\[{]/.test(val)){
+            var o={}; parent.push(o);
+            var kv=val.split(/:(.*)/); var k=kv[0].trim(); var rest=(kv[1]||'').trim();
+            if (rest==='') { stack.push({indent:indent, container:o, lastKey:k}); o[k]={}; stack.push({indent:indent+1e-6, container:o, lastKey:k}); stack.pop(); }
+            else o[k]=parseScalar(rest);
+            stack.push({indent:indent, container:o});
+          } else {
+            parent.push(parseScalar(val));
+          }
+        } else {
+          var m=content.split(/:(.*)/);
+          if (m.length<2){ var e3=new Error('Expected "key: value" but found "'+content.trim()+'".'); e3.line=idx+1; throw e3; }
+          var key=m[0].trim().replace(/^["']|["']$/g,'');
+          var rem=(m[1]||'').trim();
+          if (Array.isArray(parent)){ var e4=new Error('Mapping key inside a sequence needs a "- " prefix.'); e4.line=idx+1; throw e4; }
+          if (rem===''){ var child={}; parent[key]=child; stack.push({indent:indent, container:child, lastKey:undefined, parentObj:parent, parentKey:key}); top.lastKey=key; }
+          else { parent[key]=parseScalar(rem); top.lastKey=key; }
+        }
+      }
+      return root;
+    }
+
+    function ok(msg){ statusEl.hidden=false; statusEl.className='jx-status ok';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-check-circle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+    function err(msg){ statusEl.hidden=false; statusEl.className='jx-status err';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-exclamation-triangle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+
+    function validate(){
+      var raw=input.value;
+      if(!raw.trim()){ output.value=''; meta.textContent=''; statusEl.hidden=true; Taste.toast('Paste some YAML first','info'); return; }
+      try{
+        var obj=parseYaml(raw);
+        var json=JSON.stringify(obj,null,2);
+        output.value=json;
+        meta.textContent=json.split('\n').length+' lines';
+        ok('Valid YAML ✓');
+        Taste.toast('Valid YAML','success');
+      }catch(e){
+        output.value='';
+        meta.textContent='';
+        err('Invalid YAML'+(e.line?' (line '+e.line+')':'')+': '+e.message);
+        Taste.toast('Invalid YAML','error');
+      }
+    }
+
+    var actions={
+      validate:validate,
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste.json',output.value,'application/json'):Taste.toast('Nothing to download','info'); },
+      sample:function(){ input.value='name: Project Taste\nversion: 0.1.0\ntags:\n  - dev\n  - utils\nmeta:\n  open: true\n  stars: null'; validate(); save(); },
+      samplebad:function(){ input.value='name: Taste\ntags:\n\t- dev\n  - utils'; validate(); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; statusEl.hidden=true; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); validate(); });
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); validate(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

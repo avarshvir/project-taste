@@ -1,0 +1,167 @@
+<!-- =========================================================================
+     Project Taste — tools/jwt-expiry-calculator.html
+     Focus on a token's time claims: live countdown + iat/nbf/exp timeline.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['jwt-expiry-calculator'] = function(root,tool,Taste){}
+
+     Distinct from Decoder/Inspector: purely TIME-oriented. Reads iat/nbf/exp,
+     shows a LIVE ticking countdown to expiry, total lifetime, elapsed %, and
+     a small timeline. Also lets you paste a raw unix/ISO timestamp to convert.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-hourglass-split"></i></div>
+  <div class="tool-header-text">
+    <h1>JWT Expiry Calculator</h1>
+    <p>See exactly when a token expires — with a live countdown, total lifetime and an iat → exp timeline. All local.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="je-input">Token</label>
+    <textarea id="je-input" class="textarea-taste" style="min-height:110px" placeholder="Paste a JWT with exp / iat / nbf claims…" spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="calc"><i class="bi bi-hourglass-split"></i> Calculate</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div id="je-status" class="jx-status" hidden></div>
+
+  <div id="je-result" hidden>
+    <div class="je-countdown" id="je-countdown"></div>
+    <div class="je-progress"><span id="je-progressfill"></span></div>
+    <div class="stat-row" id="je-stats"></div>
+
+    <label class="field-label" style="margin-top:var(--sp-3)">Timeline</label>
+    <ul class="je-timeline" id="je-timeline"></ul>
+  </div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .je-countdown { text-align:center; font-family:var(--font-mono); font-size:var(--fs-3xl); font-weight:var(--fw-bold);
+    letter-spacing:-.02em; margin:var(--sp-3) 0 var(--sp-2); }
+  .je-countdown.ok { color:var(--success); }
+  .je-countdown.soon { color:var(--warning); }
+  .je-countdown.expired { color:var(--danger); }
+  .je-progress { height:8px; background:var(--bg-subtle); border:1px solid var(--border); border-radius:var(--radius-full); overflow:hidden; margin-bottom:var(--sp-3); }
+  .je-progress span { display:block; height:100%; width:0; background:var(--accent); border-radius:var(--radius-full); transition:width 1s linear; }
+  .je-timeline { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:var(--sp-1); }
+  .je-timeline li { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-2) var(--sp-3);
+    background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); font-size:var(--fs-sm); }
+  .je-timeline li .bi { color:var(--accent); }
+  .je-timeline .lbl { font-family:var(--font-mono); color:var(--accent); flex:0 0 auto; }
+  .je-timeline .val { color:var(--text-muted); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['jwt-expiry-calculator'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#je-input',root), statusEl=$('#je-status',root), resultEl=$('#je-result',root),
+        countdownEl=$('#je-countdown',root), progressFill=$('#je-progressfill',root),
+        statsEl=$('#je-stats',root), timelineEl=$('#je-timeline',root);
+    var SAVE='tool:jwt-expiry-calculator:input';
+    var timer=null, payload=null;
+
+    function b64urlDecode(part){
+      var s=part.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='=';
+      var bin=atob(s); var bytes=new Uint8Array(bin.length);
+      for(var i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+      return new TextDecoder().decode(bytes);
+    }
+    function fmt(sec){ return new Date(sec*1000).toLocaleString(); }
+    function dur(totalSec){
+      totalSec=Math.abs(Math.round(totalSec));
+      var d=Math.floor(totalSec/86400); totalSec%=86400;
+      var h=Math.floor(totalSec/3600); totalSec%=3600;
+      var m=Math.floor(totalSec/60); var s=totalSec%60;
+      var parts=[]; if(d)parts.push(d+'d'); if(h||d)parts.push(h+'h'); parts.push(m+'m'); parts.push(s+'s');
+      return parts.join(' ');
+    }
+    function err(msg){ statusEl.hidden=false; statusEl.className='jx-status err';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-exclamation-triangle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+
+    function tick(){
+      if(!payload || payload.exp==null){ return; }
+      var now=Date.now()/1000;
+      var remain=payload.exp-now;
+      countdownEl.className='je-countdown '+(remain<=0?'expired':remain<300?'soon':'ok');
+      countdownEl.textContent = remain<=0 ? 'EXPIRED' : dur(remain);
+
+      if (payload.iat!=null){
+        var life=payload.exp-payload.iat;
+        var elapsed=Math.min(life, Math.max(0, now-payload.iat));
+        progressFill.style.width=(life>0?(elapsed/life*100):100)+'%';
+        progressFill.style.background = remain<=0?'var(--danger)':remain<300?'var(--warning)':'var(--accent)';
+      }
+    }
+
+    function calc(){
+      if(timer){ clearInterval(timer); timer=null; }
+      var raw=input.value.trim();
+      if(!raw){ resultEl.hidden=true; statusEl.hidden=true; Taste.toast('Paste a JWT first','info'); return; }
+      var parts=raw.split('.');
+      if(parts.length<2){ resultEl.hidden=true; err('Not a valid JWT.'); return; }
+      try{ payload=JSON.parse(b64urlDecode(parts[1])); statusEl.hidden=true; }
+      catch(e){ resultEl.hidden=true; err('Could not decode payload.'); return; }
+
+      if (payload.exp==null){ resultEl.hidden=true; err('This token has no <code>exp</code> claim — nothing to count down.'); return; }
+
+      // stats
+      statsEl.innerHTML='';
+      var chips=[];
+      if (payload.iat!=null) chips.push(['bi-play-circle','issued','var(--accent)', fmt(payload.iat)]);
+      if (payload.nbf!=null) chips.push(['bi-pause-circle','not-before','var(--warning)', fmt(payload.nbf)]);
+      chips.push(['bi-stop-circle','expires','var(--danger)', fmt(payload.exp)]);
+      if (payload.iat!=null) chips.push(['bi-hourglass','lifetime','var(--accent)', dur(payload.exp-payload.iat)]);
+      chips.forEach(function(c){ statsEl.appendChild(el('span',{class:'stat-chip',title:c[3]},[
+        el('i',{class:'bi '+c[0],style:'color:'+c[2]}), el('strong',{text:c[1]}) ])); });
+
+      // timeline
+      timelineEl.innerHTML='';
+      [['iat','Issued at',payload.iat],['nbf','Not before',payload.nbf],['exp','Expires',payload.exp]]
+      .forEach(function(row){ if(row[2]==null) return;
+        timelineEl.appendChild(el('li',{},[
+          el('i',{class:'bi bi-dot'}),
+          el('span',{class:'lbl',text:row[0]}),
+          el('span',{class:'val',text:fmt(row[2])+'  ·  '+row[2]})
+        ]));
+      });
+
+      resultEl.hidden=false;
+      tick();
+      timer=setInterval(tick,1000);
+    }
+
+    var actions={
+      calc:calc,
+      sample:function(){
+        // build a token that expires ~2 minutes from now so the countdown is live
+        function b64(o){ return btoa(JSON.stringify(o)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+        var now=Math.floor(Date.now()/1000);
+        var h=b64({alg:'HS256',typ:'JWT'});
+        var p=b64({sub:'demo',name:'Arshvir',iat:now-60,exp:now+120});
+        input.value=h+'.'+p+'.demo-signature'; calc(); save();
+      },
+      clear:function(){ if(timer)clearInterval(timer); input.value=''; resultEl.hidden=true; statusEl.hidden=true; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t.trim(); save(); calc(); });
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); calc(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

@@ -1,0 +1,194 @@
+<!-- =========================================================================
+     Project Taste — tools/uuid.html
+     Bulk UUID generator (v4 random, v7 time-ordered, NIL) — the reference
+     "generator" blueprint reused by Nano ID, Password, API Key, etc.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['uuid'] = function (root, tool, Taste){...}
+
+     Randomness: uses crypto.getRandomValues (CSPRNG) for v4/v7 so output is
+     suitable for real identifiers. Math.random is never used for the bytes.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-fingerprint"></i></div>
+  <div class="tool-header-text">
+    <h1>UUID Generator</h1>
+    <p>Generate cryptographically-strong UUIDs in bulk — v4 random, v7 time-ordered, or the nil UUID. Copy one or all.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <!-- version switch -->
+  <div class="seg" role="tablist" aria-label="UUID version">
+    <button class="seg-btn is-active" data-ver="4" role="tab"><i class="bi bi-shuffle"></i> v4 (random)</button>
+    <button class="seg-btn" data-ver="7" role="tab"><i class="bi bi-clock"></i> v7 (time)</button>
+    <button class="seg-btn" data-ver="nil" role="tab"><i class="bi bi-slash-circle"></i> Nil</button>
+  </div>
+
+  <div class="toolbar">
+    <label class="field-label" for="uuid-count" style="margin:0 var(--sp-2) 0 0">Quantity</label>
+    <input type="number" id="uuid-count" class="input-taste" style="width:90px" min="1" max="500" value="5">
+    <label class="check-inline"><input type="checkbox" id="uuid-upper"> Uppercase</label>
+    <label class="check-inline"><input type="checkbox" id="uuid-braces"> Braces { }</label>
+    <label class="check-inline"><input type="checkbox" id="uuid-nohyphen"> No hyphens</label>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="generate"><i class="bi bi-arrow-repeat"></i> Generate</button>
+    <button class="btn-taste btn-taste-success" data-act="copyall"><i class="bi bi-clipboard-check"></i> Copy All</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div class="stat-row" id="uuid-stats"></div>
+
+  <ul class="result-list" id="uuid-results"></ul>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['uuid'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, $$ = Taste.$$, el = Taste.el;
+
+    var countEl = $('#uuid-count', root);
+    var upper   = $('#uuid-upper', root);
+    var braces  = $('#uuid-braces', root);
+    var noHyph  = $('#uuid-nohyphen', root);
+    var results = $('#uuid-results', root);
+    var stats   = $('#uuid-stats', root);
+    var version = '4';
+    var base = [];      // raw, undecorated UUIDs (source of truth)
+    var current = [];   // decorated for display / copy
+
+    /* ---- CSPRNG helpers ---- */
+    function randomBytes(n) {
+      var arr = new Uint8Array(n);
+      (window.crypto || window.msCrypto).getRandomValues(arr);
+      return arr;
+    }
+    function hex(b) { return b.toString(16).padStart(2, '0'); }
+
+    /* ---- v4: fully random with version/variant bits set ---- */
+    function v4() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      var b = randomBytes(16);
+      b[6] = (b[6] & 0x0f) | 0x40;   // version 4
+      b[8] = (b[8] & 0x3f) | 0x80;   // variant 10xx
+      return format16(b);
+    }
+
+    /* ---- v7: 48-bit unix-ms timestamp + random, version 7 ---- */
+    function v7() {
+      var b = randomBytes(16);
+      var ts = Date.now();
+      b[0] = (ts / 2**40) & 0xff;
+      b[1] = (ts / 2**32) & 0xff;
+      b[2] = (ts / 2**24) & 0xff;
+      b[3] = (ts / 2**16) & 0xff;
+      b[4] = (ts / 2**8)  & 0xff;
+      b[5] =  ts          & 0xff;
+      b[6] = (b[6] & 0x0f) | 0x70;   // version 7
+      b[8] = (b[8] & 0x3f) | 0x80;   // variant
+      return format16(b);
+    }
+
+    function format16(b) {
+      var h = Array.prototype.map.call(b, hex).join('');
+      return h.slice(0,8)+'-'+h.slice(8,12)+'-'+h.slice(12,16)+'-'+h.slice(16,20)+'-'+h.slice(20);
+    }
+
+    function nil() { return '00000000-0000-0000-0000-000000000000'; }
+
+    /* ---- apply formatting options ---- */
+    function decorate(u) {
+      if (noHyph.checked) u = u.replace(/-/g, '');
+      if (upper.checked)  u = u.toUpperCase();
+      if (braces.checked) u = '{' + u + '}';
+      return u;
+    }
+
+    function make() {
+      if (version === '4')  return v4();
+      if (version === '7')  return v7();
+      return nil();
+    }
+
+    /* ---- generate: create NEW random values, then render ---- */
+    function generate() {
+      var n = Math.max(1, Math.min(500, parseInt(countEl.value, 10) || 1));
+      countEl.value = n;
+      base = [];
+      for (var i = 0; i < n; i++) base.push(make());
+      redecorate();       // fills `current` + renders
+      renderStats(n);
+    }
+
+    /* ---- redecorate: reapply formatting to existing base values ----
+       Used when a format toggle changes, so values are PRESERVED (no
+       re-randomize) — changing "Uppercase" never gives you new UUIDs. */
+    function redecorate() {
+      current = base.map(decorate);
+      renderResults();
+    }
+
+    function renderResults() {
+      results.innerHTML = '';
+      current.forEach(function (u) {
+        results.appendChild(el('li', {}, [
+          el('i', { class: 'bi bi-fingerprint', style: 'color:var(--accent)' }),
+          el('span', { text: u }),
+          el('button', {
+            class: 'copy-inline', type: 'button', title: 'Copy',
+            onclick: function () { Taste.copy(u); }
+          }, [ el('i', { class: 'bi bi-clipboard' }) ])
+        ]));
+      });
+    }
+
+    function renderStats(n) {
+      stats.innerHTML = '';
+      var label = version === 'nil' ? 'Nil' : 'v' + version;
+      [['bi-hash', n + ' generated'], ['bi-tag', label + ' format']].forEach(function (s) {
+        stats.appendChild(el('span', { class: 'stat-chip' }, [
+          el('i', { class: 'bi ' + s[0] }),
+          el('strong', { text: String(s[1]).split(' ')[0] }),
+          document.createTextNode(' ' + s[1].split(' ').slice(1).join(' '))
+        ]));
+      });
+    }
+
+    /* ---- actions ---- */
+    var actions = {
+      generate: generate,
+      copyall:  function () { current.length ? Taste.copy(current.join('\n'))
+                                             : Taste.toast('Generate some UUIDs first', 'info'); },
+      download: function () { current.length ? Taste.download('taste-uuids.txt', current.join('\n'))
+                                             : Taste.toast('Nothing to download', 'info'); },
+      clear:    function () { base = []; current = []; results.innerHTML = ''; stats.innerHTML = ''; }
+    };
+    Taste.on(root, 'click', '[data-act]', function (e, node) {
+      var fn = actions[node.dataset.act]; if (fn) fn();
+    });
+
+    /* ---- version switch ---- */
+    Taste.on(root, 'click', '.seg-btn', function (e, node) {
+      version = node.dataset.ver;
+      $$('.seg-btn', root).forEach(function (b) { b.classList.toggle('is-active', b === node); });
+      // nil has no randomness; disable format toggles that don't apply
+      generate();
+    });
+
+    // Re-decorate live when formatting options change — values PRESERVED
+    [upper, braces, noHyph].forEach(function (chk) {
+      Taste.on(chk, 'change', function () {
+        if (base.length) redecorate();
+      });
+    });
+    Taste.on(countEl, 'keydown', function (e) { if (e.key === 'Enter') generate(); });
+
+    // First batch on open
+    generate();
+  };
+</script>

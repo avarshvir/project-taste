@@ -1,0 +1,168 @@
+<!-- =========================================================================
+     Project Taste — tools/unicode.html
+     Inspect, escape & unescape Unicode code points.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['unicode'] = function(root,tool,Taste){}
+
+     Modes:
+       Escape    → \uXXXX (with surrogate pairs) or \u{XXXX} ES6 form
+       Unescape  → turn \uXXXX / \u{...} / &#NN; / U+XXXX back into text
+       Inspect   → per-character table: char, name-ish, code point, UTF-8 bytes
+     All code-point aware (uses Array.from / codePointAt) so emoji work.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-translate"></i></div>
+  <div class="tool-header-text">
+    <h1>Unicode Tools</h1>
+    <p>Escape, unescape and inspect Unicode — see code points and UTF-8 bytes for every character, emoji included. Runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="seg" role="tablist" aria-label="Mode">
+    <button class="seg-btn is-active" data-mode="escape" role="tab"><i class="bi bi-arrow-right-square"></i> Escape</button>
+    <button class="seg-btn" data-mode="unescape" role="tab"><i class="bi bi-arrow-left-square"></i> Unescape</button>
+    <button class="seg-btn" data-mode="inspect" role="tab"><i class="bi bi-search"></i> Inspect</button>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="uni-input">Input</label>
+    <textarea id="uni-input" class="textarea-taste" placeholder="Type text, emoji, or escaped sequences…" spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="run"><i class="bi bi-play"></i> Run</button>
+    <label class="check-inline" id="uni-es6-wrap"><input type="checkbox" id="uni-es6"> ES6 form \u{...}</label>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <!-- text output (escape / unescape) -->
+  <div class="field" id="uni-outwrap">
+    <label class="field-label" for="uni-output">Output <span class="field-hint" id="uni-meta"></span></label>
+    <textarea id="uni-output" class="textarea-taste" placeholder="Result appears here…" readonly spellcheck="false"></textarea>
+  </div>
+
+  <!-- inspect table -->
+  <div id="uni-table" class="uni-table" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+  </div>
+</div>
+
+<style>
+  .uni-table { overflow:auto; max-height:420px; border:1px solid var(--border); border-radius:var(--radius-md); margin-bottom:var(--sp-4); }
+  .uni-table table { width:100%; border-collapse:collapse; font-size:var(--fs-sm); }
+  .uni-table th, .uni-table td { text-align:left; padding:var(--sp-2) var(--sp-3); border-bottom:1px solid var(--border); white-space:nowrap; }
+  .uni-table th { position:sticky; top:0; background:var(--surface-2); color:var(--text-subtle); font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.05em; }
+  .uni-table td.ch { font-size:var(--fs-lg); }
+  .uni-table td.mono { font-family:var(--font-mono); color:var(--accent); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['unicode'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, $$ = Taste.$$, el = Taste.el;
+    var input=$('#uni-input',root), output=$('#uni-output',root), outWrap=$('#uni-outwrap',root),
+        meta=$('#uni-meta',root), tableBox=$('#uni-table',root), es6Chk=$('#uni-es6',root), es6Wrap=$('#uni-es6-wrap',root);
+    var mode='escape', SAVE='tool:unicode:input';
+    var lastText='';
+
+    function pad4(h){ while(h.length<4) h='0'+h; return h; }
+
+    function escape(str){
+      var out='';
+      for (var i=0;i<str.length;i++){
+        var code=str.charCodeAt(i);
+        if (code<128){ out+=str[i]; continue; }
+        if (es6Chk.checked){
+          var cp=str.codePointAt(i);
+          out+='\\u{'+cp.toString(16).toUpperCase()+'}';
+          if (cp>0xFFFF) i++; // consumed a surrogate pair
+        } else {
+          out+='\\u'+pad4(code.toString(16).toUpperCase());
+        }
+      }
+      return out;
+    }
+
+    function unescape(str){
+      return str
+        .replace(/\\u\{([0-9a-fA-F]+)\}/g,function(_,h){ return String.fromCodePoint(parseInt(h,16)); })
+        .replace(/\\u([0-9a-fA-F]{4})/g,function(_,h){ return String.fromCharCode(parseInt(h,16)); })
+        .replace(/U\+([0-9a-fA-F]{4,6})/g,function(_,h){ return String.fromCodePoint(parseInt(h,16)); })
+        .replace(/&#x([0-9a-fA-F]+);/g,function(_,h){ return String.fromCodePoint(parseInt(h,16)); })
+        .replace(/&#(\d+);/g,function(_,d){ return String.fromCodePoint(parseInt(d,10)); });
+    }
+
+    function utf8Bytes(cp){
+      var s=String.fromCodePoint(cp);
+      var bytes=new TextEncoder().encode(s);
+      return Array.prototype.map.call(bytes,function(b){ return b.toString(16).toUpperCase().padStart(2,'0'); }).join(' ');
+    }
+
+    function inspect(str){
+      var chars=Array.from(str);
+      var table=el('table',{});
+      table.appendChild(el('thead',{},[el('tr',{},[
+        el('th',{text:'Char'}),el('th',{text:'Code point'}),el('th',{text:'Decimal'}),
+        el('th',{text:'HTML'}),el('th',{text:'UTF-8'})
+      ])]));
+      var tb=el('tbody',{});
+      chars.forEach(function(ch){
+        var cp=ch.codePointAt(0);
+        tb.appendChild(el('tr',{},[
+          el('td',{class:'ch',text:ch}),
+          el('td',{class:'mono',text:'U+'+cp.toString(16).toUpperCase().padStart(4,'0')}),
+          el('td',{class:'mono',text:String(cp)}),
+          el('td',{class:'mono',text:'&#'+cp+';'}),
+          el('td',{class:'mono',text:utf8Bytes(cp)})
+        ]));
+      });
+      table.appendChild(tb);
+      tableBox.innerHTML=''; tableBox.appendChild(table);
+      meta.textContent=chars.length+' char'+(chars.length===1?'':'s');
+    }
+
+    function run(){
+      var raw=input.value;
+      if(!raw){ output.value=''; tableBox.hidden=true; meta.textContent=''; Taste.toast('Type something first','info'); return; }
+      if (mode==='inspect'){
+        outWrap.hidden=true; tableBox.hidden=false; inspect(raw); lastText='';
+      } else {
+        tableBox.hidden=true; outWrap.hidden=false;
+        var result = mode==='escape'?escape(raw):unescape(raw);
+        output.value=result; lastText=result;
+        meta.textContent=Array.from(result).length+' chars';
+      }
+    }
+
+    var actions={
+      run:run,
+      sample:function(){ input.value = mode==='unescape' ? 'Taste \\u{1F34B} \\u00E9' : 'Taste 🍋 café'; run(); save(); },
+      clear:function(){ input.value=''; output.value=''; tableBox.hidden=true; meta.textContent=''; Taste.store.remove(SAVE); },
+      copy:function(){ mode==='inspect'?Taste.toast('Switch to Escape/Unescape to copy text','info'):Taste.copy(output.value); },
+      download:function(){ lastText?Taste.download('taste-unicode.txt',lastText):Taste.toast('Nothing to download','info'); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    Taste.on(root,'click','.seg-btn',function(e,node){
+      mode=node.dataset.mode;
+      $$('.seg-btn',root).forEach(function(b){ b.classList.toggle('is-active', b===node); });
+      es6Wrap.style.display = mode==='escape' ? '' : 'none';
+      if(input.value.trim()) run();
+    });
+    Taste.on(es6Chk,'change',function(){ if(mode==='escape'&&input.value) run(); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); run(); });
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); run(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

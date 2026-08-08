@@ -1,0 +1,174 @@
+<!-- =========================================================================
+     Project Taste — tools/sql-explain-visualizer.html
+     Visualize a query EXPLAIN plan as an indented tree with cost/row bars.
+     TasteTools: window.TasteTools['sql-explain-visualizer'] = fn(root,tool,Taste)
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-diagram-3"></i></div>
+  <div class="tool-header-text">
+    <h1>SQL Explain Visualizer</h1>
+    <p>Paste a query plan (text or JSON <code>EXPLAIN</code>) and see it as a readable tree with relative-cost bars. Nothing is executed — it just visualizes.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="se-input">EXPLAIN output <span class="field-hint">(Postgres text or JSON plan)</span></label>
+    <textarea id="se-input" class="textarea-taste" style="min-height:150px" placeholder="Paste EXPLAIN or EXPLAIN (FORMAT JSON) output…" spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="visualize"><i class="bi bi-diagram-3"></i> Visualize</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sampletext"><i class="bi bi-card-text"></i> Text sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="samplejson"><i class="bi bi-braces"></i> JSON sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div id="se-status" class="jx-status" hidden></div>
+  <div class="stat-row" id="se-stats"></div>
+
+  <label class="field-label">Plan tree</label>
+  <div class="se-tree" id="se-tree"><p class="no-results" style="text-align:center">Paste a plan and hit Visualize.</p></div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin:var(--sp-2) 0 var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .jx-status.ok  { background:var(--badge-new-bg); color:var(--badge-new-text); }
+  .se-tree { background:var(--code-bg); border:1px solid var(--border); border-radius:var(--radius-md);
+    padding:var(--sp-2); overflow:auto; max-height:480px; }
+  .se-node { padding:var(--sp-1) var(--sp-2); border-radius:var(--radius-sm); margin:2px 0; }
+  .se-node:hover { background:var(--surface-hover); }
+  .se-nodehead { display:flex; align-items:center; gap:var(--sp-2); font-family:var(--font-ui);
+    font-weight:var(--fw-semibold); font-size:var(--fs-sm); color:var(--text); }
+  .se-op { color:var(--accent); }
+  .se-detail { font-family:var(--font-mono); font-size:var(--fs-xs); color:var(--text-muted); margin-left:1.6em; }
+  .se-costbar { height:6px; border-radius:var(--radius-full); background:var(--bg-subtle); overflow:hidden; margin:3px 0 3px 1.6em; max-width:320px; }
+  .se-costbar span { display:block; height:100%; border-radius:var(--radius-full); }
+  .se-badge { font-size:var(--fs-xs); font-family:var(--font-mono); color:var(--text-subtle); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['sql-explain-visualizer'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#se-input',root), tree=$('#se-tree',root), statusEl=$('#se-status',root), stats=$('#se-stats',root);
+    var SAVE='tool:sql-explain-visualizer:input';
+    var maxCost=1;
+
+    function status(kind,msg){ statusEl.hidden=false; statusEl.className='jx-status '+kind;
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi '+(kind==='ok'?'bi-check-circle-fill':'bi-exclamation-triangle-fill')}));
+      statusEl.appendChild(el('span',{text:msg})); }
+
+    function fromJsonNode(p){
+      var node={
+        op: p['Node Type'] || p.node_type || (p.query_block?'Query Block':'Node'),
+        cost: p['Total Cost']!=null?p['Total Cost']:(p.cost_info&&parseFloat(p.cost_info.query_cost))||0,
+        rows: p['Plan Rows']!=null?p['Plan Rows']:(p.rows_produced_per_join||p.rows||null),
+        detail: [], children: []
+      };
+      ['Relation Name','Index Name','Join Type','Filter','Hash Cond','Sort Key','table_name','access_type']
+        .forEach(function(k){ if(p[k]!=null) node.detail.push(k+': '+(typeof p[k]==='object'?JSON.stringify(p[k]):p[k])); });
+      var kids = p.Plans || p.plans || [];
+      if (p.query_block) kids=kids.concat([p.query_block]);
+      if (p.table) kids=kids.concat([p.table]);
+      (Array.isArray(kids)?kids:[kids]).forEach(function(c){ if(c&&typeof c==='object') node.children.push(fromJsonNode(c)); });
+      if (node.cost>maxCost) maxCost=node.cost;
+      return node;
+    }
+    function tryJson(text){
+      var data=JSON.parse(text);
+      var planRoot = Array.isArray(data) ? (data[0].Plan||data[0]) : (data.Plan||data.query_block||data);
+      maxCost=1;
+      return fromJsonNode(planRoot);
+    }
+    function tryText(text){
+      var lines=text.split('\n').filter(function(l){ return l.trim()!==''; });
+      maxCost=1;
+      var rootNodes=[], stack=[];
+      lines.forEach(function(line){
+        var indent=line.search(/\S/);
+        var content=line.trim().replace(/^->\s*/,'');
+        var costM=/cost=[\d.]+\.\.([\d.]+)/.exec(line);
+        var rowsM=/rows=(\d+)/.exec(line);
+        var opM=/^([A-Za-z][A-Za-z ]+?)(?:\s+on|\s+using|\(|$)/.exec(content);
+        var node={ op: opM?opM[1].trim():content.split('(')[0].trim(), cost: costM?parseFloat(costM[1]):0,
+                   rows: rowsM?parseInt(rowsM[1],10):null, detail:[content], children:[] };
+        if (node.cost>maxCost) maxCost=node.cost;
+        while (stack.length && stack[stack.length-1].indent>=indent) stack.pop();
+        if (!stack.length) rootNodes.push(node);
+        else stack[stack.length-1].node.children.push(node);
+        stack.push({indent:indent, node:node});
+      });
+      if (!rootNodes.length) throw new Error('No plan nodes recognised.');
+      return rootNodes.length===1?rootNodes[0]:{op:'Plan',cost:0,rows:null,detail:[],children:rootNodes};
+    }
+    function colorFor(ratio){ if (ratio>0.66) return 'var(--danger)'; if (ratio>0.33) return 'var(--warning)'; return 'var(--success)'; }
+
+    var nodeCount=0;
+    function renderNode(node, depth){
+      nodeCount++;
+      var wrap=el('div',{class:'se-node',style:'margin-left:'+(depth*1.2)+'em'});
+      var head=el('div',{class:'se-nodehead'},[
+        el('i',{class:'bi bi-caret-right-fill se-op'}),
+        el('span',{class:'se-op',text:node.op||'Node'})
+      ]);
+      var badgeText=[];
+      if (node.cost) badgeText.push('cost '+node.cost);
+      if (node.rows!=null) badgeText.push('rows '+node.rows);
+      if (badgeText.length) head.appendChild(el('span',{class:'se-badge',text:'  ·  '+badgeText.join(' · ')}));
+      wrap.appendChild(head);
+      if (node.cost){
+        var ratio=Math.min(1,node.cost/maxCost);
+        wrap.appendChild(el('div',{class:'se-costbar'},[ el('span',{style:'width:'+Math.max(4,ratio*100)+'%;background:'+colorFor(ratio)}) ]));
+      }
+      (node.detail||[]).forEach(function(d){ if(d && d!==node.op) wrap.appendChild(el('div',{class:'se-detail',text:d})); });
+      tree.appendChild(wrap);
+      (node.children||[]).forEach(function(c){ renderNode(c, depth+1); });
+    }
+
+    function visualize(){
+      var raw=input.value.trim(); stats.innerHTML='';
+      if(!raw){ Taste.toast('Paste an EXPLAIN plan first','info'); return; }
+      var rootNode, kind;
+      try{ rootNode=tryJson(raw); kind='JSON'; }
+      catch(e){
+        try{ rootNode=tryText(raw); kind='text'; }
+        catch(e2){ status('err','Could not parse plan: '+e2.message); tree.innerHTML='<p class="no-results" style="text-align:center">Unrecognised plan format.</p>'; return; }
+      }
+      tree.innerHTML=''; nodeCount=0;
+      renderNode(rootNode, 0);
+      status('ok','Parsed '+kind+' plan · '+nodeCount+' node'+(nodeCount===1?'':'s')+' · peak cost '+Math.round(maxCost));
+      [['bi-diagram-3', nodeCount+' nodes'],['bi-graph-up', Math.round(maxCost)+' peak cost'],['bi-filetype-'+(kind==='JSON'?'json':'txt'), kind+' input']]
+      .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    var actions={
+      visualize:visualize,
+      sampletext:function(){ input.value=
+"Sort  (cost=120.50..125.75 rows=210 width=44)\n"+
+"  Sort Key: orders.total DESC\n"+
+"  ->  Hash Join  (cost=35.20..98.40 rows=210 width=44)\n"+
+"        Hash Cond: (orders.user_id = users.id)\n"+
+"        ->  Seq Scan on orders  (cost=0.00..45.10 rows=2100 width=20)\n"+
+"        ->  Hash  (cost=22.60..22.60 rows=800 width=24)\n"+
+"              ->  Seq Scan on users  (cost=0.00..22.60 rows=800 width=24)\n"+
+"                    Filter: (active = true)"; visualize(); save(); },
+      samplejson:function(){ input.value=JSON.stringify([{"Plan":{"Node Type":"Aggregate","Total Cost":150.2,"Plan Rows":1,"Plans":[{"Node Type":"Seq Scan","Relation Name":"events","Total Cost":120.0,"Plan Rows":5000,"Filter":"(type = 'click')"}]}}],null,2); visualize(); save(); },
+      clear:function(){ input.value=''; tree.innerHTML='<p class="no-results" style="text-align:center">Paste a plan and hit Visualize.</p>'; stats.innerHTML=''; statusEl.hidden=true; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); visualize(); });
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); visualize(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

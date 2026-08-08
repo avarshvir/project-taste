@@ -1,0 +1,143 @@
+<!-- =========================================================================
+     Project Taste — tools/json-validator.html
+     Validate JSON and pinpoint the exact error location.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['json-validator'] = function(root,tool,Taste){}
+
+     Validation is native JSON.parse; on failure we translate the parser's
+     character offset into line:column and show a context snippet so the
+     user can jump straight to the problem.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-check2-circle"></i></div>
+  <div class="tool-header-text">
+    <h1>JSON Validator</h1>
+    <p>Check whether JSON is valid and get the exact line and column of any error — with a context snippet. Runs entirely in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="jv-input">JSON <span class="field-hint">(paste or drag &amp; drop a .json file)</span></label>
+    <textarea id="jv-input" class="textarea-taste" style="min-height:220px" placeholder='{"name":"Taste","valid":true}' spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="validate"><i class="bi bi-check2-circle"></i> Validate</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="samplebad"><i class="bi bi-bug"></i> Broken sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div id="jv-status" class="jv-status" hidden></div>
+  <div id="jv-snippet" class="code-output" hidden style="max-height:160px"></div>
+  <div class="stat-row" id="jv-stats"></div>
+</div>
+
+<style>
+  .jv-status { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-3);
+    margin-bottom:var(--sp-3); border-radius:var(--radius-md); font-size:var(--fs-sm); font-weight:var(--fw-medium); }
+  .jv-status.ok  { background:var(--badge-new-bg); color:var(--badge-new-text); }
+  .jv-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .jv-status .bi { font-size:var(--fs-lg); }
+  .jv-snippet-mark { color:var(--danger); font-weight:var(--fw-bold); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['json-validator'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#jv-input',root), statusEl=$('#jv-status',root), snippet=$('#jv-snippet',root), stats=$('#jv-stats',root);
+    var SAVE='tool:json-validator:input';
+
+    function locate(text, err){
+      var m=/position (\d+)/.exec(err.message);
+      if(!m) return null;
+      var pos=parseInt(m[1],10);
+      var upto=text.slice(0,pos);
+      return { line:upto.split('\n').length, col:pos-upto.lastIndexOf('\n'), pos:pos };
+    }
+
+    function showStatus(ok,msg){
+      statusEl.hidden=false;
+      statusEl.className='jv-status '+(ok?'ok':'err');
+      statusEl.innerHTML='';
+      statusEl.appendChild(el('i',{class:'bi '+(ok?'bi-check-circle-fill':'bi-exclamation-triangle-fill')}));
+      statusEl.appendChild(el('span',{html:msg}));
+    }
+
+    function showSnippet(text, loc){
+      if(!loc){ snippet.hidden=true; return; }
+      var lines=text.split('\n');
+      var ln=loc.line-1;
+      var from=Math.max(0,ln-2), to=Math.min(lines.length-1,ln+2);
+      snippet.innerHTML='';
+      for(var i=from;i<=to;i++){
+        var prefix=(i+1)+' | ';
+        var row=el('div',{});
+        if(i===ln){
+          row.innerHTML='<span class="jv-snippet-mark">'+Taste.escapeHtml(prefix+lines[i])+'</span>';
+          var caret=el('div',{class:'jv-snippet-mark',
+            text:' '.repeat(prefix.length+loc.col-1)+'^'});
+          snippet.appendChild(row); snippet.appendChild(caret);
+        } else {
+          row.textContent=prefix+lines[i];
+          snippet.appendChild(row);
+        }
+      }
+      snippet.hidden=false;
+    }
+
+    function typeOf(v){ return Array.isArray(v)?'array':(v===null?'null':typeof v); }
+    function countKeys(v){
+      if(Array.isArray(v)) return v.reduce(function(s,x){return s+countKeys(x);},0);
+      if(v&&typeof v==='object') return Object.keys(v).reduce(function(s,k){return s+1+countKeys(v[k]);},0);
+      return 0;
+    }
+    function depthOf(v){
+      if(Array.isArray(v)) return 1+v.reduce(function(m,x){return Math.max(m,depthOf(x));},0);
+      if(v&&typeof v==='object') return 1+Object.keys(v).reduce(function(m,k){return Math.max(m,depthOf(v[k]));},0);
+      return 0;
+    }
+
+    function validate(){
+      var raw=input.value.trim();
+      stats.innerHTML=''; snippet.hidden=true;
+      if(!raw){ statusEl.hidden=true; Taste.toast('Paste some JSON first','info'); return; }
+      try{
+        var obj=JSON.parse(raw);
+        showStatus(true,'Valid JSON ✓ — root is <strong>'+typeOf(obj)+'</strong>.');
+        [['bi-diagram-2', typeOf(obj)+' root'],['bi-key', countKeys(obj)+' keys'],
+         ['bi-diagram-3', depthOf(obj)+' depth'],['bi-hdd', Taste.bytes(new Blob([raw]).size)]]
+        .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+          el('i',{class:'bi '+s[0]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+          document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+        Taste.toast('Valid JSON','success');
+      }catch(err){
+        var loc=locate(raw,err);
+        showStatus(false,'Invalid JSON: '+Taste.escapeHtml(err.message)+
+          (loc?'  <strong>(line '+loc.line+', column '+loc.col+')</strong>':''));
+        showSnippet(raw,loc);
+        Taste.toast('Invalid JSON','error');
+      }
+    }
+
+    var actions={
+      validate:validate,
+      sample:function(){ input.value='{\n  "name": "Project Taste",\n  "tools": 127,\n  "tags": ["dev","utils"],\n  "meta": { "open": true }\n}'; validate(); save(); },
+      samplebad:function(){ input.value='{\n  "name": "Taste",\n  "tools": 127,\n  "tags": ["dev" "utils"]\n}'; validate(); save(); },
+      clear:function(){ input.value=''; statusEl.hidden=true; snippet.hidden=true; stats.innerHTML=''; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); validate(); },{accept:/json|text/});
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); validate(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

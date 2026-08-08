@@ -1,0 +1,104 @@
+<!-- =========================================================================
+     Project Taste — tools/json-pretty-print.html
+     Pretty-print (beautify) JSON with configurable indentation.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['json-pretty-print'] = function(root,tool,Taste){}
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-text-indent-left"></i></div>
+  <div class="tool-header-text">
+    <h1>JSON Pretty Print</h1>
+    <p>Turn compact or messy JSON into clean, indented, human-readable output — with optional key sorting. Runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="jp-input">Input <span class="field-hint">(paste JSON)</span></label>
+      <textarea id="jp-input" class="textarea-taste" placeholder='{"a":1,"b":[2,3],"c":{"d":4}}' spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="jp-output">Pretty <span class="field-hint" id="jp-meta"></span></label>
+      <textarea id="jp-output" class="textarea-taste" placeholder="Indented JSON appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div id="jp-status" class="jp-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="pretty"><i class="bi bi-text-indent-left"></i> Pretty Print</button>
+    <label class="field-label" for="jp-indent" style="margin:0 var(--sp-1) 0 var(--sp-2)">Indent</label>
+    <select id="jp-indent" class="select-taste" style="width:auto">
+      <option value="2">2 spaces</option>
+      <option value="4">4 spaces</option>
+      <option value="8">8 spaces</option>
+      <option value="\t">Tab</option>
+    </select>
+    <label class="check-inline"><input type="checkbox" id="jp-sort"> Sort keys</label>
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    <button class="btn-taste btn-taste-ghost" data-act="swap"><i class="bi bi-arrow-down-up"></i> Swap</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<style>
+  .jp-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jp-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['json-pretty-print'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#jp-input',root), output=$('#jp-output',root), meta=$('#jp-meta',root),
+        statusEl=$('#jp-status',root), indentSel=$('#jp-indent',root), sortChk=$('#jp-sort',root);
+    var SAVE='tool:json-pretty-print:input';
+
+    function indentVal(){ var v=indentSel.value; return v==='\\t'?'\t':parseInt(v,10); }
+    function sortKeys(v){
+      if(Array.isArray(v)) return v.map(sortKeys);
+      if(v&&typeof v==='object') return Object.keys(v).sort().reduce(function(a,k){ a[k]=sortKeys(v[k]); return a; },{});
+      return v;
+    }
+    function err(msg){ statusEl.hidden=false; statusEl.className='jp-status err';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-exclamation-triangle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+
+    function pretty(){
+      var raw=input.value.trim();
+      if(!raw){ output.value=''; meta.textContent=''; statusEl.hidden=true; Taste.toast('Paste some JSON first','info'); return; }
+      var obj;
+      try{ obj=JSON.parse(raw); statusEl.hidden=true; }
+      catch(e){ output.value=''; meta.textContent=''; err('Invalid JSON: '+e.message); Taste.toast('Invalid JSON','error'); return; }
+      if(sortChk.checked) obj=sortKeys(obj);
+      var result=JSON.stringify(obj,null,indentVal());
+      output.value=result;
+      meta.textContent=result.split('\n').length+' lines · '+Taste.bytes(new Blob([result]).size);
+    }
+
+    var actions={
+      pretty:pretty,
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste-pretty.json',output.value,'application/json'):Taste.toast('Nothing to download','info'); },
+      swap:function(){ if(!output.value)return Taste.toast('No output to swap','info'); input.value=output.value; save(); },
+      sample:function(){ input.value='{"name":"Taste","tools":127,"tags":["dev","utils"],"meta":{"open":true,"stars":null}}'; pretty(); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; statusEl.hidden=true; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    [indentSel,sortChk].forEach(function(c){ Taste.on(c,'change',function(){ if(output.value)pretty(); }); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); pretty(); },{accept:/json|text/});
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); pretty(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

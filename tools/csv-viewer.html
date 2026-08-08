@@ -1,0 +1,209 @@
+<!-- =========================================================================
+     Project Taste — tools/csv-viewer.html
+     Parse & view CSV as a sortable, searchable table; export to JSON.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['csv-viewer'] = function(root,tool,Taste){}
+
+     Includes a proper RFC-4180-aware CSV parser (handles quoted fields,
+     escaped double-quotes, and embedded newlines/commas). The table can be
+     sorted by clicking a column header and filtered with a live search box.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-table"></i></div>
+  <div class="tool-header-text">
+    <h1>CSV Viewer</h1>
+    <p>Paste or drop a CSV to view it as a clean, sortable, searchable table — then export to JSON. Handles quoted fields correctly.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="cv-input">CSV <span class="field-hint">(paste or drag &amp; drop a .csv file)</span></label>
+    <textarea id="cv-input" class="textarea-taste" style="min-height:120px" placeholder="id,name,role&#10;1,Ann,dev&#10;2,Bo,design" spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="parse"><i class="bi bi-table"></i> View Table</button>
+    <label class="field-label" for="cv-delim" style="margin:0 var(--sp-1) 0 var(--sp-2)">Delimiter</label>
+    <select id="cv-delim" class="select-taste" style="width:auto">
+      <option value="auto">Auto-detect</option>
+      <option value=",">Comma</option>
+      <option value=";">Semicolon</option>
+      <option value="\t">Tab</option>
+      <option value="|">Pipe</option>
+    </select>
+    <label class="check-inline"><input type="checkbox" id="cv-header" checked> First row is header</label>
+  </div>
+
+  <div class="input-row" id="cv-searchrow" hidden>
+    <input type="text" id="cv-search" class="input-taste" placeholder="Filter rows…" spellcheck="false">
+  </div>
+
+  <div id="cv-status" class="jx-status" hidden></div>
+  <div class="stat-row" id="cv-stats"></div>
+
+  <div class="cv-table-wrap" id="cv-table"></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="tojson"><i class="bi bi-braces"></i> Export JSON</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download JSON</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .cv-table-wrap { overflow:auto; max-height:460px; border:1px solid var(--border); border-radius:var(--radius-md); margin-bottom:var(--sp-3); }
+  .cv-table-wrap:empty { display:none; }
+  table.cv-table { width:100%; border-collapse:collapse; font-size:var(--fs-sm); font-family:var(--font-mono); }
+  table.cv-table th, table.cv-table td { text-align:left; padding:var(--sp-2) var(--sp-3); border-bottom:1px solid var(--border); white-space:nowrap; }
+  table.cv-table thead th { position:sticky; top:0; background:var(--surface-2); color:var(--text); font-family:var(--font-ui);
+    cursor:pointer; user-select:none; z-index:1; }
+  table.cv-table thead th:hover { color:var(--accent); }
+  table.cv-table thead th .sort { opacity:.5; margin-left:.35em; font-size:.85em; }
+  table.cv-table tbody tr:nth-child(even) { background:var(--bg-subtle); }
+  table.cv-table tbody tr:hover { background:var(--surface-hover); }
+  table.cv-table td.rownum { color:var(--text-subtle); text-align:right; }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['csv-viewer'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#cv-input',root), tableWrap=$('#cv-table',root), statusEl=$('#cv-status',root),
+        stats=$('#cv-stats',root), delimSel=$('#cv-delim',root), headerChk=$('#cv-header',root),
+        searchRow=$('#cv-searchrow',root), searchEl=$('#cv-search',root);
+    var SAVE='tool:csv-viewer:input';
+    var state={ cols:[], rows:[], sortCol:-1, sortDir:1 };
+
+    function detectDelim(text){
+      var firstLine=text.split('\n')[0]||'';
+      var counts={',':0,';':0,'\t':0,'|':0};
+      for (var i=0;i<firstLine.length;i++){ if(counts[firstLine[i]]!==undefined) counts[firstLine[i]]++; }
+      var best=',', bestN=-1;
+      Object.keys(counts).forEach(function(d){ if(counts[d]>bestN){ bestN=counts[d]; best=d; } });
+      return best;
+    }
+
+    // RFC-4180-aware parser
+    function parseCSV(text, d){
+      var rows=[], row=[], cur='', inQ=false;
+      for (var i=0;i<text.length;i++){
+        var c=text[i];
+        if (inQ){
+          if (c==='"'){ if (text[i+1]==='"'){ cur+='"'; i++; } else inQ=false; }
+          else cur+=c;
+        } else {
+          if (c==='"'){ inQ=true; }
+          else if (c===d){ row.push(cur); cur=''; }
+          else if (c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+          else if (c==='\r'){ /* skip */ }
+          else cur+=c;
+        }
+      }
+      if (cur!==''||row.length){ row.push(cur); rows.push(row); }
+      return rows.filter(function(r){ return !(r.length===1 && r[0]===''); });
+    }
+
+    function err(msg){ statusEl.hidden=false; statusEl.className='jx-status err';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-exclamation-triangle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+
+    function parse(){
+      var raw=input.value; statusEl.hidden=true; stats.innerHTML='';
+      if(!raw.trim()){ tableWrap.innerHTML=''; searchRow.hidden=true; Taste.toast('Paste some CSV first','info'); return; }
+      var d = delimSel.value==='auto' ? detectDelim(raw) : (delimSel.value==='\\t'?'\t':delimSel.value);
+      var grid=parseCSV(raw, d);
+      if(!grid.length){ err('No rows found.'); return; }
+
+      var cols, rows;
+      if (headerChk.checked){ cols=grid[0]; rows=grid.slice(1); }
+      else { cols=grid[0].map(function(_,i){ return 'col'+(i+1); }); rows=grid; }
+
+      state.cols=cols; state.rows=rows; state.sortCol=-1; state.sortDir=1;
+      searchRow.hidden=false;
+      renderStats();
+      renderTable(rows);
+    }
+
+    function renderStats(){
+      stats.innerHTML='';
+      [['bi-table', state.rows.length+' rows'],['bi-layout-three-columns', state.cols.length+' columns']]
+      .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    function renderTable(rows){
+      var table=el('table',{class:'cv-table'});
+      var thead=el('thead',{}), htr=el('tr',{});
+      htr.appendChild(el('th',{text:'#'}));
+      state.cols.forEach(function(c,ci){
+        var arrow = state.sortCol===ci ? (state.sortDir>0?'▲':'▼') : '↕';
+        htr.appendChild(el('th',{dataset:{col:ci},title:'Sort by '+c},[
+          document.createTextNode(c+' '),
+          el('span',{class:'sort',text:arrow})
+        ]));
+      });
+      thead.appendChild(htr); table.appendChild(thead);
+
+      var tbody=el('tbody',{});
+      rows.forEach(function(r,ri){
+        var tr=el('tr',{});
+        tr.appendChild(el('td',{class:'rownum',text:String(ri+1)}));
+        state.cols.forEach(function(_,ci){ tr.appendChild(el('td',{text:r[ci]!==undefined?r[ci]:''})); });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      tableWrap.innerHTML=''; tableWrap.appendChild(table);
+    }
+
+    function sortBy(ci){
+      if (state.sortCol===ci) state.sortDir*=-1; else { state.sortCol=ci; state.sortDir=1; }
+      var rows=state.rows.slice().sort(function(a,b){
+        var x=a[ci]||'', y=b[ci]||'';
+        var nx=parseFloat(x), ny=parseFloat(y);
+        var cmp = (!isNaN(nx)&&!isNaN(ny)) ? nx-ny : String(x).localeCompare(String(y));
+        return cmp*state.sortDir;
+      });
+      renderTable(applyFilter(rows));
+    }
+
+    function applyFilter(rows){
+      var q=(searchEl.value||'').trim().toLowerCase();
+      if(!q) return rows;
+      return rows.filter(function(r){ return r.some(function(cell){ return String(cell).toLowerCase().indexOf(q)!==-1; }); });
+    }
+
+    function toObjects(){
+      return state.rows.map(function(r){
+        var o={}; state.cols.forEach(function(c,ci){ o[c]=r[ci]!==undefined?r[ci]:''; }); return o;
+      });
+    }
+
+    var actions={
+      parse:parse,
+      tojson:function(){ if(!state.cols.length)return Taste.toast('Parse a CSV first','info'); Taste.copy(JSON.stringify(toObjects(),null,2)); },
+      download:function(){ if(!state.cols.length)return Taste.toast('Parse a CSV first','info'); Taste.download('taste-csv.json', JSON.stringify(toObjects(),null,2),'application/json'); },
+      sample:function(){ input.value='id,name,role,active\n1,"Ann, A.",dev,true\n2,Bo,design,false\n3,"Cy ""The Ace""",qa,true'; parse(); save(); },
+      clear:function(){ input.value=''; tableWrap.innerHTML=''; stats.innerHTML=''; statusEl.hidden=true; searchRow.hidden=true; state={cols:[],rows:[],sortCol:-1,sortDir:1}; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    Taste.on(tableWrap,'click','th[data-col]',function(e,node){ sortBy(parseInt(node.dataset.col,10)); });
+    [delimSel,headerChk].forEach(function(c){ Taste.on(c,'change',function(){ if(input.value.trim())parse(); }); });
+    Taste.on(searchEl,'input',function(){ if(state.rows.length) renderTable(applyFilter(state.rows)); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); parse(); },{accept:/csv|text/});
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); parse(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

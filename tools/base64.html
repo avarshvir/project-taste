@@ -1,0 +1,236 @@
+<!-- =========================================================================
+     Project Taste — tools/base64.html
+     Base64 encode / decode for TEXT and FILES (with image preview).
+
+     Fragment injected by router.js. Follows the TasteTools contract:
+         window.TasteTools['base64'] = function (root, tool, Taste) { ... }
+
+     Notes:
+       - Text mode is UTF-8 SAFE: naive btoa()/atob() break on emojis and
+         non-Latin characters, so we round-trip through TextEncoder/Decoder.
+       - File mode uses FileReader.readAsDataURL and can strip / keep the
+         "data:...;base64," prefix.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-file-binary"></i></div>
+  <div class="tool-header-text">
+    <h1>Base64 Encode / Decode</h1>
+    <p>Convert text and files to and from Base64 — UTF-8 safe, with image preview. Everything runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <!-- Mode switch: text vs file -->
+  <div class="seg" role="tablist" aria-label="Base64 mode">
+    <button class="seg-btn is-active" data-mode="text" role="tab"><i class="bi bi-fonts"></i> Text</button>
+    <button class="seg-btn" data-mode="file" role="tab"><i class="bi bi-file-earmark-arrow-up"></i> File / Image</button>
+  </div>
+
+  <!-- ============ TEXT MODE ============ -->
+  <div data-panel="text">
+    <div class="field">
+      <label class="field-label" for="b64-input">Input
+        <span class="field-hint">(text or Base64 — drag &amp; drop a text file too)</span>
+      </label>
+      <textarea id="b64-input" class="textarea-taste" placeholder="Type text to encode, or paste Base64 to decode…" spellcheck="false"></textarea>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn-taste btn-taste-primary" data-act="encode"><i class="bi bi-arrow-right-square"></i> Encode</button>
+      <button class="btn-taste btn-taste-primary" data-act="decode"><i class="bi bi-arrow-left-square"></i> Decode</button>
+      <label class="check-inline" title="Make output safe for URLs (- and _ instead of + and /)">
+        <input type="checkbox" id="b64-urlsafe"> URL-safe
+      </label>
+      <button class="btn-taste btn-taste-secondary" data-act="swap"><i class="bi bi-arrow-down-up"></i> Swap</button>
+      <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+      <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="b64-output">Result <span class="field-hint" id="b64-meta"></span></label>
+      <textarea id="b64-output" class="textarea-taste" placeholder="Your result appears here…" readonly spellcheck="false"></textarea>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy Result</button>
+      <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    </div>
+  </div>
+
+  <!-- ============ FILE MODE ============ -->
+  <div data-panel="file" hidden>
+    <label class="dropzone" id="b64-drop" for="b64-file">
+      <i class="bi bi-cloud-arrow-up"></i>
+      <span class="dropzone-title">Drop a file here or click to browse</span>
+      <span class="dropzone-sub">Any file type · encoded to a Base64 data URI locally</span>
+      <input type="file" id="b64-file" hidden>
+    </label>
+
+    <div id="b64-preview" class="file-preview" hidden>
+      <img id="b64-img" alt="Preview" />
+      <div class="file-preview-meta" id="b64-fileinfo"></div>
+    </div>
+
+    <div class="toolbar">
+      <label class="check-inline" title="Include the data:...;base64, prefix">
+        <input type="checkbox" id="b64-prefix" checked> Include data URI prefix
+      </label>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="b64-fileout">Base64 output <span class="field-hint" id="b64-filemeta"></span></label>
+      <textarea id="b64-fileout" class="textarea-taste" placeholder="Base64 of your file appears here…" readonly spellcheck="false"></textarea>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn-taste btn-taste-success" data-act="copyfile"><i class="bi bi-clipboard-check"></i> Copy Base64</button>
+      <button class="btn-taste btn-taste-secondary" data-act="downloadfile"><i class="bi bi-download"></i> Download .txt</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['base64'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, $$ = Taste.$$;
+
+    /* ----------------- shared refs ----------------- */
+    var input   = $('#b64-input', root);
+    var output  = $('#b64-output', root);
+    var metaEl  = $('#b64-meta', root);
+    var urlSafe = $('#b64-urlsafe', root);
+    var SAVE_KEY = 'tool:base64:input';
+
+    var fileInput = $('#b64-file', root);
+    var dropEl    = $('#b64-drop', root);
+    var fileOut   = $('#b64-fileout', root);
+    var prefixChk = $('#b64-prefix', root);
+    var previewBox= $('#b64-preview', root);
+    var previewImg= $('#b64-img', root);
+    var fileInfo  = $('#b64-fileinfo', root);
+    var fileMeta  = $('#b64-filemeta', root);
+    var lastDataUrl = '';
+
+    /* ----------------- UTF-8 safe text codec ----------------- */
+    function encodeText(str) {
+      var bytes = new TextEncoder().encode(str);
+      var bin = '';
+      bytes.forEach(function (b) { bin += String.fromCharCode(b); });
+      var b64 = btoa(bin);
+      return urlSafe.checked
+        ? b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+        : b64;
+    }
+    function decodeText(str) {
+      var s = str.trim().replace(/-/g, '+').replace(/_/g, '/');
+      while (s.length % 4) s += '=';
+      var bin = atob(s);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new TextDecoder().decode(bytes);
+    }
+
+    /* ----------------- text UI ----------------- */
+    function setOutput(text, isError) {
+      output.value = text;
+      output.style.color = isError ? 'var(--danger)' : '';
+      if (isError || !text) { metaEl.textContent = ''; return; }
+      metaEl.textContent = text.length + ' chars · ' + Taste.bytes(new Blob([text]).size);
+    }
+    function run(mode) {
+      var v = input.value;
+      if (!v) { setOutput('', false); Taste.toast('Nothing to process', 'info'); return; }
+      try { setOutput(mode === 'encode' ? encodeText(v) : decodeText(v), false); }
+      catch (err) { setOutput('Error: invalid Base64 input', true); Taste.toast('Invalid Base64', 'error'); }
+    }
+
+    /* ----------------- file mode ----------------- */
+    function handleFile(file) {
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        lastDataUrl = String(reader.result);
+        renderFile(file);
+      };
+      reader.onerror = function () { Taste.toast('Could not read file', 'error'); };
+      reader.readAsDataURL(file);
+    }
+    function renderFile(file) {
+      // Toggle prefix
+      var comma = lastDataUrl.indexOf(',');
+      fileOut.value = prefixChk.checked ? lastDataUrl : lastDataUrl.slice(comma + 1);
+      fileMeta.textContent = fileOut.value.length + ' chars · ' + Taste.bytes(file.size) + ' original';
+
+      // Image preview
+      if (file.type.indexOf('image/') === 0) {
+        previewImg.src = lastDataUrl;
+        previewBox.hidden = false;
+      } else {
+        previewBox.hidden = false;
+        previewImg.removeAttribute('src');
+      }
+      fileInfo.innerHTML = '<strong>' + Taste.escapeHtml(file.name) + '</strong><br>' +
+        (file.type || 'unknown type') + ' · ' + Taste.bytes(file.size);
+    }
+
+    /* ----------------- actions ----------------- */
+    var actions = {
+      encode:  function () { run('encode'); },
+      decode:  function () { run('decode'); },
+      swap:    function () { if (!output.value) return Taste.toast('No result to swap', 'info');
+                             input.value = output.value; setOutput('', false); save(); },
+      sample:  function () { input.value = 'Taste 🍋 — encode me!'; run('encode'); save(); },
+      clear:   function () { input.value=''; setOutput('', false); Taste.store.remove(SAVE_KEY); },
+      copy:    function () { Taste.copy(output.value); },
+      download:function () { output.value ? Taste.download('taste-base64.txt', output.value)
+                                          : Taste.toast('Nothing to download', 'info'); },
+      copyfile:function () { Taste.copy(fileOut.value); },
+      downloadfile:function () { fileOut.value ? Taste.download('taste-base64-file.txt', fileOut.value)
+                                               : Taste.toast('No file encoded yet', 'info'); }
+    };
+    Taste.on(root, 'click', '[data-act]', function (e, node) {
+      var fn = actions[node.dataset.act]; if (fn) fn();
+    });
+
+    /* ----------------- mode switching ----------------- */
+    Taste.on(root, 'click', '.seg-btn', function (e, node) {
+      var mode = node.dataset.mode;
+      $$('.seg-btn', root).forEach(function (b) { b.classList.toggle('is-active', b === node); });
+      $('[data-panel="text"]', root).hidden = mode !== 'text';
+      $('[data-panel="file"]', root).hidden = mode !== 'file';
+    });
+
+    /* ----------------- file wiring ----------------- */
+    Taste.on(fileInput, 'change', function (e) { handleFile(e.target.files[0]); });
+    Taste.on(prefixChk, 'change', function () { if (lastDataUrl) {
+      var comma = lastDataUrl.indexOf(',');
+      fileOut.value = prefixChk.checked ? lastDataUrl : lastDataUrl.slice(comma + 1);
+      fileMeta.textContent = fileOut.value.length + ' chars';
+    }});
+    // Drag & drop on the dropzone (binary-aware, so not Taste.dropzone which reads text)
+    ['dragenter','dragover'].forEach(function (t){ dropEl.addEventListener(t, function(ev){
+      ev.preventDefault(); dropEl.classList.add('is-dragover'); }); });
+    ['dragleave','dragend','drop'].forEach(function (t){ dropEl.addEventListener(t, function(ev){
+      ev.preventDefault(); dropEl.classList.remove('is-dragover'); }); });
+    dropEl.addEventListener('drop', function (ev){
+      var f = ev.dataTransfer && ev.dataTransfer.files[0]; if (f) handleFile(f); });
+
+    /* ----------------- autosave + restore (text) ----------------- */
+    var save = Taste.debounce(function () { Taste.store.set(SAVE_KEY, input.value); }, 400);
+    Taste.on(input, 'input', save);
+    var saved = Taste.store.get(SAVE_KEY, '');
+    if (saved) input.value = saved;
+
+    // Text-file drop onto the text input
+    Taste.dropzone(input, function (text) { input.value = text; save(); Taste.toast('File loaded', 'success'); });
+
+    // Ctrl/⌘ + Enter = encode
+    Taste.on(input, 'keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); run('encode'); }
+    });
+
+    input.focus();
+  };
+</script>

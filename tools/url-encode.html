@@ -1,0 +1,121 @@
+<!-- =========================================================================
+     Project Taste — tools/url-encode.html
+     Percent-encode / decode URLs and their components.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['url-encode'] = function(root,tool,Taste){}
+
+     Two modes: "component" (encodeURIComponent — safe for query values &
+     path segments) and "full URL" (encodeURI — preserves : / ? & # etc.).
+     Also includes a query-string parser that breaks a URL into a readable
+     key/value table.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-link-45deg"></i></div>
+  <div class="tool-header-text">
+    <h1>URL Encode / Decode</h1>
+    <p>Percent-encode or decode URLs and query values — component-safe or whole-URL — plus a query-string breakdown. Runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="seg" role="tablist" aria-label="Encoding scope">
+    <button class="seg-btn is-active" data-scope="component" role="tab"><i class="bi bi-braces"></i> Component</button>
+    <button class="seg-btn" data-scope="full" role="tab"><i class="bi bi-globe"></i> Full URL</button>
+  </div>
+
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="ue-input">Input</label>
+      <textarea id="ue-input" class="textarea-taste" placeholder="Type text or a URL…" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="ue-output">Output <span class="field-hint" id="ue-meta"></span></label>
+      <textarea id="ue-output" class="textarea-taste" placeholder="Result appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="encode"><i class="bi bi-arrow-right-square"></i> Encode</button>
+    <button class="btn-taste btn-taste-primary" data-act="decode"><i class="bi bi-arrow-left-square"></i> Decode</button>
+    <button class="btn-taste btn-taste-secondary" data-act="parse"><i class="bi bi-list-columns"></i> Parse query</button>
+    <button class="btn-taste btn-taste-secondary" data-act="swap"><i class="bi bi-arrow-down-up"></i> Swap</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div id="ue-query" class="ue-query" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+  </div>
+</div>
+
+<style>
+  .ue-query { margin-bottom:var(--sp-4); }
+  .ue-query table { width:100%; border-collapse:collapse; font-size:var(--fs-sm); }
+  .ue-query th, .ue-query td { text-align:left; padding:var(--sp-2) var(--sp-3); border-bottom:1px solid var(--border); word-break:break-all; }
+  .ue-query th { color:var(--text-subtle); font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.05em; }
+  .ue-query td:first-child { font-family:var(--font-mono); color:var(--accent); white-space:nowrap; }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['url-encode'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, $$ = Taste.$$, el = Taste.el;
+    var input=$('#ue-input',root), output=$('#ue-output',root), meta=$('#ue-meta',root), queryBox=$('#ue-query',root);
+    var scope='component', SAVE='tool:url-encode:input';
+
+    function enc(s){ return scope==='full'?encodeURI(s):encodeURIComponent(s); }
+    function dec(s){ try{ return scope==='full'?decodeURI(s):decodeURIComponent(s); }catch(e){ return s.replace(/%(?![0-9A-Fa-f]{2})/g,'%25'); } }
+
+    function setOut(text){ output.value=text; meta.textContent=text?(text.length+' chars'):''; queryBox.hidden=true; }
+
+    function parseQuery(){
+      var raw=input.value.trim();
+      if(!raw){ Taste.toast('Paste a URL first','info'); return; }
+      var qIndex=raw.indexOf('?');
+      var qs=qIndex>=0?raw.slice(qIndex+1):raw;
+      var hashIndex=qs.indexOf('#'); if(hashIndex>=0) qs=qs.slice(0,hashIndex);
+      var pairs=qs.split('&').filter(Boolean);
+      if(!pairs.length){ Taste.toast('No query parameters found','info'); return; }
+      var table=el('table',{});
+      table.appendChild(el('thead',{},[el('tr',{},[el('th',{text:'Key'}),el('th',{text:'Value (decoded)'})])]));
+      var tb=el('tbody',{});
+      pairs.forEach(function(p){
+        var eq=p.indexOf('=');
+        var k=eq>=0?p.slice(0,eq):p, v=eq>=0?p.slice(eq+1):'';
+        tb.appendChild(el('tr',{},[el('td',{text:decodeURIComponent(k)}),el('td',{text:dec(v.replace(/\+/g,' '))})]));
+      });
+      table.appendChild(tb);
+      queryBox.innerHTML=''; queryBox.appendChild(el('label',{class:'field-label',text:'Query parameters'})); queryBox.appendChild(table);
+      queryBox.hidden=false;
+    }
+
+    var actions={
+      encode:function(){ if(!input.value)return Taste.toast('Nothing to encode','info'); setOut(enc(input.value)); },
+      decode:function(){ if(!input.value)return Taste.toast('Nothing to decode','info'); setOut(dec(input.value)); },
+      parse:parseQuery,
+      swap:function(){ if(!output.value)return Taste.toast('No output to swap','info'); input.value=output.value; setOut(''); save(); },
+      sample:function(){ input.value='https://taste.dev/search?q=hello world&lang=en&tags=a,b#top'; actions.encode(); save(); },
+      clear:function(){ input.value=''; setOut(''); Taste.store.remove(SAVE); },
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste-url.txt',output.value):Taste.toast('Nothing to download','info'); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    Taste.on(root,'click','.seg-btn',function(e,node){
+      scope=node.dataset.scope;
+      $$('.seg-btn',root).forEach(function(b){ b.classList.toggle('is-active', b===node); });
+    });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); });
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); actions.encode(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

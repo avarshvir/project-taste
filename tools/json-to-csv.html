@@ -1,0 +1,165 @@
+<!-- =========================================================================
+     Project Taste — tools/json-to-csv.html
+     Convert a JSON array of objects into CSV.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['json-to-csv'] = function(root,tool,Taste){}
+
+     Handles: array of objects (typical), a single object (one row), and
+     nested objects/arrays (flattened with dot / [index] paths). The column
+     set is the UNION of all keys across rows, so ragged data still works.
+     CSV values are RFC-4180 quoted when they contain the delimiter, quotes
+     or newlines.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-filetype-csv"></i></div>
+  <div class="tool-header-text">
+    <h1>JSON to CSV</h1>
+    <p>Flatten a JSON array of objects into CSV — nested fields are expanded and the header is the union of all keys. Runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="jcsv-input">JSON <span class="field-hint">(array of objects, or a single object)</span></label>
+      <textarea id="jcsv-input" class="textarea-taste" placeholder='[{"id":1,"name":"Ann"},{"id":2,"name":"Bo"}]' spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="jcsv-output">CSV <span class="field-hint" id="jcsv-meta"></span></label>
+      <textarea id="jcsv-output" class="textarea-taste" placeholder="CSV output appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div id="jcsv-status" class="jx-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="convert"><i class="bi bi-arrow-right"></i> Convert</button>
+    <label class="field-label" for="jcsv-delim" style="margin:0 var(--sp-1) 0 var(--sp-2)">Delimiter</label>
+    <select id="jcsv-delim" class="select-taste" style="width:auto">
+      <option value=",">Comma ( , )</option>
+      <option value=";">Semicolon ( ; )</option>
+      <option value="\t">Tab</option>
+      <option value="|">Pipe ( | )</option>
+    </select>
+    <label class="check-inline"><input type="checkbox" id="jcsv-flatten" checked> Flatten nested</label>
+    <label class="check-inline"><input type="checkbox" id="jcsv-header" checked> Header row</label>
+  </div>
+
+  <div class="stat-row" id="jcsv-stats"></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download .csv</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['json-to-csv'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#jcsv-input',root), output=$('#jcsv-output',root), meta=$('#jcsv-meta',root),
+        statusEl=$('#jcsv-status',root), stats=$('#jcsv-stats',root),
+        delimSel=$('#jcsv-delim',root), flattenChk=$('#jcsv-flatten',root), headerChk=$('#jcsv-header',root);
+    var SAVE='tool:json-to-csv:input';
+
+    function delim(){ var v=delimSel.value; return v==='\\t'?'\t':v; }
+
+    // Flatten a nested object into { 'a.b.c': value, 'list[0]': value }
+    function flatten(obj, prefix, out){
+      out=out||{};
+      if (Array.isArray(obj)){
+        obj.forEach(function(v,i){ flatten(v, prefix+'['+i+']', out); });
+      } else if (obj && typeof obj==='object'){
+        Object.keys(obj).forEach(function(k){
+          var p=prefix?prefix+'.'+k:k;
+          flatten(obj[k], p, out);
+        });
+      } else {
+        out[prefix]=obj;
+      }
+      return out;
+    }
+
+    function toRow(item){
+      if (flattenChk.checked && item && typeof item==='object' && !Array.isArray(item)) return flatten(item,'');
+      if (item && typeof item==='object' && !Array.isArray(item)){
+        // shallow: stringify nested values
+        var r={}; Object.keys(item).forEach(function(k){
+          var v=item[k]; r[k]=(v&&typeof v==='object')?JSON.stringify(v):v; }); return r;
+      }
+      // primitive or array element → single "value" column
+      return { value: (item&&typeof item==='object')?JSON.stringify(item):item };
+    }
+
+    function esc(val, d){
+      if (val===null||val===undefined) return '';
+      var s=String(val);
+      if (s.indexOf(d)!==-1 || s.indexOf('"')!==-1 || /[\n\r]/.test(s)){
+        return '"'+s.replace(/"/g,'""')+'"';
+      }
+      return s;
+    }
+
+    function err(msg){ statusEl.hidden=false; statusEl.className='jx-status err';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-exclamation-triangle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+
+    function convert(){
+      var raw=input.value.trim(); stats.innerHTML='';
+      if(!raw){ output.value=''; meta.textContent=''; statusEl.hidden=true; Taste.toast('Paste some JSON first','info'); return; }
+      var data;
+      try{ data=JSON.parse(raw); statusEl.hidden=true; }
+      catch(e){ output.value=''; meta.textContent=''; err('Invalid JSON: '+e.message); Taste.toast('Invalid JSON','error'); return; }
+
+      var arr = Array.isArray(data) ? data : [data];
+      var rows = arr.map(toRow);
+
+      // union of columns, preserving first-seen order
+      var cols=[], seen={};
+      rows.forEach(function(r){ Object.keys(r).forEach(function(k){ if(!seen[k]){ seen[k]=true; cols.push(k); } }); });
+
+      var d=delim(), lines=[];
+      if (headerChk.checked) lines.push(cols.map(function(c){ return esc(c,d); }).join(d));
+      rows.forEach(function(r){
+        lines.push(cols.map(function(c){ return esc(r[c],d); }).join(d));
+      });
+      var result=lines.join('\n');
+      output.value=result;
+      meta.textContent=rows.length+' rows · '+cols.length+' cols';
+
+      [['bi-table', rows.length+' rows'],['bi-layout-three-columns', cols.length+' columns'],
+       ['bi-hdd', Taste.bytes(new Blob([result]).size)]]
+      .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    var actions={
+      convert:convert,
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste.csv',output.value,'text/csv'):Taste.toast('Nothing to download','info'); },
+      sample:function(){ input.value='[\n  {"id":1,"name":"Ann","role":{"team":"dev"}},\n  {"id":2,"name":"Bo","role":{"team":"design"},"active":true}\n]'; convert(); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; statusEl.hidden=true; stats.innerHTML=''; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    [delimSel,flattenChk,headerChk].forEach(function(c){ Taste.on(c,'change',function(){ if(output.value)convert(); }); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); convert(); },{accept:/json|text/});
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); convert(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

@@ -1,0 +1,108 @@
+<!-- =========================================================================
+     Project Taste — tools/remove-empty-lines.html
+     Remove empty / blank lines from text, with options.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['remove-empty-lines'] = function(root,tool,Taste){}
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-file-earmark-minus"></i></div>
+  <div class="tool-header-text">
+    <h1>Remove Empty Lines</h1>
+    <p>Delete blank lines from any text block — optionally collapse multiple blanks, trim whitespace, or remove whitespace-only lines. Runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="re-input">Input</label>
+      <textarea id="re-input" class="textarea-taste" placeholder="Paste text with blank lines here…" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="re-output">Output <span class="field-hint" id="re-meta"></span></label>
+      <textarea id="re-output" class="textarea-taste" placeholder="Cleaned text appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="run"><i class="bi bi-eraser"></i> Remove Empty Lines</button>
+    <label class="check-inline"><input type="checkbox" id="re-ws" checked> Treat whitespace-only as empty</label>
+    <label class="check-inline"><input type="checkbox" id="re-collapse"> Collapse instead of remove</label>
+    <label class="check-inline"><input type="checkbox" id="re-trim"> Trim each line</label>
+  </div>
+
+  <div class="stat-row" id="re-stats"></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    <button class="btn-taste btn-taste-ghost" data-act="swap"><i class="bi bi-arrow-down-up"></i> Swap</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['remove-empty-lines'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#re-input',root), output=$('#re-output',root), meta=$('#re-meta',root), stats=$('#re-stats',root);
+    var wsEmpty=$('#re-ws',root), collapse=$('#re-collapse',root), trim=$('#re-trim',root);
+    var SAVE='tool:remove-empty-lines:input';
+
+    function isBlank(line){ return wsEmpty.checked ? line.trim()==='' : line===''; }
+
+    function run(){
+      var lines = input.value.split('\n');
+      var out = [], removed = 0, prevBlank = false;
+      lines.forEach(function(line){
+        var l = trim.checked ? line.trim() : line;
+        if (isBlank(l)) {
+          if (collapse.checked) {
+            if (prevBlank) { removed++; return; }   // drop consecutive blanks
+            prevBlank = true;
+            out.push('');                            // keep a single blank
+          } else {
+            removed++; return;                       // drop all blanks
+          }
+        } else {
+          prevBlank = false;
+          out.push(l);
+        }
+      });
+      // avoid a trailing blank left by collapse
+      while (collapse.checked && out.length && out[out.length-1]==='') out.pop();
+      output.value = out.join('\n');
+      meta.textContent = out.length + ' lines · ' + removed + ' removed';
+      renderStats(lines.length, out.length, removed);
+    }
+
+    function renderStats(total, kept, removed){
+      stats.innerHTML='';
+      [['bi-list-ol', total+' input lines'],['bi-check2', kept+' kept'],['bi-trash', removed+' removed']]
+      .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    var actions={
+      run:run,
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste-cleaned.txt',output.value):Taste.toast('Nothing to download','info'); },
+      swap:function(){ if(!output.value)return Taste.toast('No output to swap','info'); input.value=output.value; save(); run(); },
+      sample:function(){ input.value='First line\n\n\nSecond line\n   \nThird line\n\n'; run(); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; stats.innerHTML=''; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    [wsEmpty,collapse,trim].forEach(function(c){ Taste.on(c,'change',function(){ if(output.value||input.value)run(); }); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); run(); Taste.toast('File loaded','success'); });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; run(); }
+    input.focus();
+  };
+</script>

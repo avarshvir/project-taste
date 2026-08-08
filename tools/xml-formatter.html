@@ -1,0 +1,164 @@
+<!-- =========================================================================
+     Project Taste — tools/xml-formatter.html
+     Format (beautify) & minify XML, with validation.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['xml-formatter'] = function(root,tool,Taste){}
+
+     Uses the browser's native DOMParser to validate, then a dependency-free
+     pretty-printer that re-indents element/text/comment/CDATA nodes. Minify
+     collapses insignificant whitespace between tags.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-filetype-xml"></i></div>
+  <div class="tool-header-text">
+    <h1>XML Formatter</h1>
+    <p>Beautify, minify and validate XML — with clear error reporting. Everything runs in your browser using the native parser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="xf-input">Input <span class="field-hint">(paste or drag &amp; drop an .xml file)</span></label>
+      <textarea id="xf-input" class="textarea-taste" placeholder="&lt;root&gt;&lt;item id='1'&gt;Taste&lt;/item&gt;&lt;/root&gt;" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="xf-output">Output <span class="field-hint" id="xf-meta"></span></label>
+      <textarea id="xf-output" class="textarea-taste" placeholder="Formatted XML appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div id="xf-status" class="jx-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="format"><i class="bi bi-text-indent-left"></i> Format</button>
+    <button class="btn-taste btn-taste-primary" data-act="minify"><i class="bi bi-arrows-collapse"></i> Minify</button>
+    <button class="btn-taste btn-taste-secondary" data-act="validate"><i class="bi bi-check2-circle"></i> Validate</button>
+    <label class="field-label" for="xf-indent" style="margin:0 var(--sp-1) 0 var(--sp-2)">Indent</label>
+    <select id="xf-indent" class="select-taste" style="width:auto">
+      <option value="2">2 spaces</option>
+      <option value="4">4 spaces</option>
+      <option value="\t">Tab</option>
+    </select>
+  </div>
+
+  <div class="stat-row" id="xf-stats"></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download .xml</button>
+    <button class="btn-taste btn-taste-ghost" data-act="swap"><i class="bi bi-arrow-down-up"></i> Swap</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .jx-status.ok  { background:var(--badge-new-bg); color:var(--badge-new-text); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['xml-formatter'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#xf-input',root), output=$('#xf-output',root), meta=$('#xf-meta',root),
+        statusEl=$('#xf-status',root), stats=$('#xf-stats',root), indentSel=$('#xf-indent',root);
+    var SAVE='tool:xml-formatter:input';
+
+    function indentUnit(){ var v=indentSel.value; return v==='\\t'?'\t':' '.repeat(parseInt(v,10)); }
+
+    function parse(xml){
+      var doc=new DOMParser().parseFromString(xml,'application/xml');
+      var errNode=doc.querySelector('parsererror');
+      if (errNode) throw new Error(errNode.textContent.replace(/\s+/g,' ').trim().slice(0,200));
+      return doc;
+    }
+
+    // Recursively serialize with indentation
+    function pretty(node, level, unit){
+      var pad=unit.repeat(level), out='';
+      for (var i=0;i<node.childNodes.length;i++){
+        var n=node.childNodes[i];
+        if (n.nodeType===1){ // element
+          var open='<'+n.nodeName;
+          for (var a=0;a<n.attributes.length;a++){ open+=' '+n.attributes[a].name+'="'+n.attributes[a].value+'"'; }
+          var elementChildren=Array.prototype.filter.call(n.childNodes,function(c){ return c.nodeType===1; });
+          var textOnly=n.childNodes.length===1 && n.childNodes[0].nodeType===3;
+          if (!n.childNodes.length){ out+=pad+open+'/>\n'; }
+          else if (textOnly){ out+=pad+open+'>'+n.textContent.trim()+'</'+n.nodeName+'>\n'; }
+          else { out+=pad+open+'>\n'+pretty(n,level+1,unit)+pad+'</'+n.nodeName+'>\n'; }
+        } else if (n.nodeType===3){ // text
+          var t=n.textContent.trim(); if (t) out+=pad+t+'\n';
+        } else if (n.nodeType===8){ // comment
+          out+=pad+'<!--'+n.textContent+'-->\n';
+        } else if (n.nodeType===4){ // CDATA
+          out+=pad+'<![CDATA['+n.textContent+']]>\n';
+        }
+      }
+      return out;
+    }
+
+    function err(msg){ statusEl.hidden=false; statusEl.className='jx-status err';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-exclamation-triangle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+    function ok(msg){ statusEl.hidden=false; statusEl.className='jx-status ok';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-check-circle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+
+    function renderStats(before, after){
+      stats.innerHTML='';
+      [['bi-hdd', Taste.bytes(before)+' in'],['bi-hdd-fill', Taste.bytes(after)+' out']]
+      .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    function run(mode){
+      var raw=input.value.trim(); stats.innerHTML='';
+      if(!raw){ output.value=''; meta.textContent=''; statusEl.hidden=true; Taste.toast('Paste some XML first','info'); return; }
+      var doc;
+      try{ doc=parse(raw); }
+      catch(e){ output.value=''; meta.textContent=''; err('Invalid XML: '+e.message); Taste.toast('Invalid XML','error'); return; }
+
+      if (mode==='validate'){ ok('Valid XML ✓ — root <'+doc.documentElement.nodeName+'>'); renderStats(new Blob([raw]).size,new Blob([raw]).size); return; }
+
+      var result;
+      if (mode==='minify'){
+        result=new XMLSerializer().serializeToString(doc).replace(/>\s+</g,'><').trim();
+      } else {
+        var decl=/^<\?xml[^>]*\?>/i.exec(raw);
+        result=(decl?decl[0]+'\n':'')+pretty(doc, 0, indentUnit()).replace(/\n$/,'');
+      }
+      output.value=result;
+      meta.textContent=result.split('\n').length+' lines';
+      ok(mode==='minify'?'Valid XML — minified':'Valid XML — formatted');
+      renderStats(new Blob([raw]).size, new Blob([result]).size);
+    }
+
+    var actions={
+      format:function(){ run('format'); },
+      minify:function(){ run('minify'); },
+      validate:function(){ run('validate'); },
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste.xml',output.value,'application/xml'):Taste.toast('Nothing to download','info'); },
+      swap:function(){ if(!output.value)return Taste.toast('No output to swap','info'); input.value=output.value; save(); },
+      sample:function(){ input.value='<?xml version="1.0"?><catalog><book id="1"><title>Taste</title><tags><tag>dev</tag><tag>utils</tag></tags></book><!-- more soon --></catalog>'; run('format'); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; statusEl.hidden=true; stats.innerHTML=''; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    Taste.on(indentSel,'change',function(){ if(output.value)run('format'); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); run('format'); },{accept:/xml|text/});
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); run('format'); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

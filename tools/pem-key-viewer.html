@@ -1,0 +1,181 @@
+<!-- =========================================================================
+     Project Taste — tools/pem-key-viewer.html
+     Inspect PEM blocks: certificates, public/private keys, CSRs.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['pem-key-viewer'] = function(root,tool,Taste){}
+
+     Dependency-free. Detects each -----BEGIN X----- ... -----END X-----
+     block, decodes its Base64 DER, and reports: label/type, DER byte length,
+     an approximate key size (walked from the DER for RSA), and a light ASN.1
+     structure outline (tag/length tree, shallow). Everything is local — keys
+     never leave the browser. Read-only.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-file-lock"></i></div>
+  <div class="tool-header-text">
+    <h1>PEM Key Viewer</h1>
+    <p>Inspect PEM certificates and keys — type, DER size, key length and a shallow ASN.1 outline. Everything stays in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="pem-input">PEM <span class="field-hint">(paste one or more -----BEGIN ...----- blocks, or drag &amp; drop a .pem file)</span></label>
+    <textarea id="pem-input" class="textarea-taste" style="min-height:180px" placeholder="-----BEGIN PUBLIC KEY-----&#10;MFkwEwYHKoZI...&#10;-----END PUBLIC KEY-----" spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="inspect"><i class="bi bi-search"></i> Inspect</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div id="pem-status" class="jx-status" hidden></div>
+  <div id="pem-result"></div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .jx-status.ok  { background:var(--badge-new-bg); color:var(--badge-new-text); }
+  .pem-block { background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-md);
+    padding:var(--sp-3) var(--sp-4); margin-bottom:var(--sp-3); }
+  .pem-block h4 { display:flex; align-items:center; gap:var(--sp-2); font-size:var(--fs-md); margin-bottom:var(--sp-2); }
+  .pem-block h4 .bi { color:var(--accent); }
+  .pem-asn1 { font-family:var(--font-mono); font-size:var(--fs-xs); color:var(--text-muted);
+    background:var(--code-bg); border-radius:var(--radius-sm); padding:var(--sp-2) var(--sp-3); margin-top:var(--sp-2);
+    max-height:220px; overflow:auto; white-space:pre; }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['pem-key-viewer'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#pem-input',root), statusEl=$('#pem-status',root), resultEl=$('#pem-result',root);
+    var SAVE='tool:pem-key-viewer:input';
+
+    function status(kind,msg){ statusEl.hidden=false; statusEl.className='jx-status '+kind;
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi '+(kind==='ok'?'bi-check-circle-fill':'bi-exclamation-triangle-fill')}));
+      statusEl.appendChild(el('span',{text:msg})); }
+
+    // base64 → Uint8Array
+    function b64ToBytes(b64){
+      var bin=atob(b64.replace(/\s+/g,''));
+      var out=new Uint8Array(bin.length);
+      for(var i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i);
+      return out;
+    }
+
+    // Shallow ASN.1 DER walk → text outline (depth-limited)
+    var TAGS={0x02:'INTEGER',0x03:'BIT STRING',0x04:'OCTET STRING',0x05:'NULL',0x06:'OBJECT IDENTIFIER',
+      0x0C:'UTF8String',0x13:'PrintableString',0x16:'IA5String',0x17:'UTCTime',0x18:'GeneralizedTime',
+      0x30:'SEQUENCE',0x31:'SET',0xA0:'[0]',0xA3:'[3]'};
+    function walk(bytes, start, end, depth, lines){
+      var i=start;
+      while (i<end && depth<6){
+        var tag=bytes[i++];
+        if (i>=end) break;
+        var len=bytes[i++];
+        if (len&0x80){
+          var n=len&0x7f; len=0;
+          for(var k=0;k<n;k++){ len=(len<<8)|bytes[i++]; }
+        }
+        var name=TAGS[tag]||('0x'+tag.toString(16));
+        lines.push(new Array(depth+1).join('  ')+name+' ('+len+' bytes)');
+        var constructed=(tag&0x20)!==0;
+        if (constructed && depth<5){ walk(bytes, i, i+len, depth+1, lines); }
+        i+=len;
+        if (lines.length>400){ lines.push('… (truncated)'); return; }
+      }
+    }
+
+    // crude RSA key-size guess: first INTEGER (modulus) bit length inside SEQUENCE
+    function rsaModulusBits(bytes){
+      try{
+        // find a long INTEGER (>64 bytes) — heuristic for the modulus
+        var i=0, best=0;
+        while (i<bytes.length-2){
+          if (bytes[i]===0x02){ // INTEGER
+            var j=i+1, len=bytes[j++];
+            if (len&0x80){ var n=len&0x7f; len=0; for(var k=0;k<n;k++) len=(len<<8)|bytes[j++]; }
+            if (len>best && len>=64){ best=len; }
+            i=j+len;
+          } else i++;
+        }
+        if (best){ var bits=best*8; // account for leading 0x00 sign byte
+          return Math.round(bits/256)*256 || bits; }
+      }catch(e){}
+      return null;
+    }
+
+    function labelIcon(label){
+      if (/PRIVATE/.test(label)) return 'bi-shield-lock-fill';
+      if (/PUBLIC/.test(label)) return 'bi-unlock';
+      if (/CERTIFICATE REQUEST|CSR/.test(label)) return 'bi-file-earmark-text';
+      if (/CERTIFICATE/.test(label)) return 'bi-patch-check';
+      return 'bi-file-lock';
+    }
+
+    function inspect(){
+      var raw=input.value; resultEl.innerHTML=''; statusEl.hidden=true;
+      if(!raw.trim()){ Taste.toast('Paste a PEM block first','info'); return; }
+
+      var re=/-----BEGIN ([^-]+)-----([\s\S]*?)-----END \1-----/g, m, count=0;
+      while ((m=re.exec(raw))!==null){
+        count++;
+        var label=m[1].trim(), body=m[2];
+        var block=el('div',{class:'pem-block'});
+        block.appendChild(el('h4',{},[ el('i',{class:'bi '+labelIcon(label)}), document.createTextNode(label) ]));
+
+        var stats=el('div',{class:'stat-row'});
+        var bytes=null, derErr=null;
+        try{ bytes=b64ToBytes(body); }catch(e){ derErr=e.message; }
+
+        if (bytes){
+          var chips=[['bi-hdd', Taste.bytes(bytes.length)+' DER']];
+          if (/RSA|PUBLIC|PRIVATE|CERTIFICATE/.test(label)){
+            var bits=rsaModulusBits(bytes);
+            if (bits) chips.push(['bi-key', bits+'-bit (approx)']);
+          }
+          var lines=body.replace(/\s+/g,'').length;
+          chips.push(['bi-textarea-t', lines+' b64 chars']);
+          chips.forEach(function(c){ stats.appendChild(el('span',{class:'stat-chip'},[
+            el('i',{class:'bi '+c[0]}), el('strong',{text:String(c[1]).split(' ')[0]}),
+            document.createTextNode(' '+c[1].split(' ').slice(1).join(' '))])); });
+          block.appendChild(stats);
+
+          var lineOut=[]; try{ walk(bytes,0,bytes.length,0,lineOut); }catch(e){ lineOut=['(could not parse ASN.1)']; }
+          block.appendChild(el('div',{class:'pem-asn1',text:lineOut.join('\n')||'(no structure)'}));
+        } else {
+          block.appendChild(el('p',{style:'color:var(--danger)',text:'Could not Base64-decode this block: '+derErr}));
+        }
+        resultEl.appendChild(block);
+      }
+
+      if (!count){ status('err','No PEM blocks found. Expecting -----BEGIN ...----- / -----END ...----- markers.'); return; }
+      status('ok','Parsed '+count+' PEM block'+(count===1?'':'s')+'. Keys never leave your browser.');
+    }
+
+    var actions={
+      inspect:inspect,
+      sample:function(){ input.value=
+'-----BEGIN PUBLIC KEY-----\n'+
+'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9Qp2Xg3aQpP2t8Xw9m0S6b0kF3aQ\n'+
+'2sT1oO7cF9YkQpq1kFhZ0m3tE8Yy1Q6bXwqz2n8mQ0R4bT9c1lJ2xk8w==\n'+
+'-----END PUBLIC KEY-----'; inspect(); save(); },
+      clear:function(){ input.value=''; resultEl.innerHTML=''; statusEl.hidden=true; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); inspect(); });
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); inspect(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

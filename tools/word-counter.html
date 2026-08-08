@@ -1,0 +1,182 @@
+<!-- =========================================================================
+     Project Taste — tools/word-counter.html
+     Live text analysis: counts, reading time, and keyword density.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['word-counter'] = function (root, tool, Taste){...}
+
+     Everything updates live as you type. Metrics are computed generically
+     from the text (no per-input hacks). Reading/speaking time uses common
+     WPM baselines (200 reading, 130 speaking).
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-123"></i></div>
+  <div class="tool-header-text">
+    <h1>Word Counter</h1>
+    <p>Live word, character, sentence and paragraph counts — plus reading time and keyword density. All computed in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="wc-input">Text <span class="field-hint">(type or paste — analysis updates live)</span></label>
+    <textarea id="wc-input" class="textarea-taste" style="min-height:200px"
+      placeholder="Start typing or paste your text here…" spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+    <button class="btn-taste btn-taste-secondary" data-act="copystats"><i class="bi bi-clipboard-check"></i> Copy Stats</button>
+  </div>
+
+  <!-- primary counts -->
+  <div class="stat-row" id="wc-stats"></div>
+
+  <!-- reading / speaking time + extras -->
+  <div class="tool-split" style="margin-top:var(--sp-2)">
+    <div>
+      <label class="field-label">Timing &amp; averages</label>
+      <div class="stat-row" id="wc-time"></div>
+    </div>
+    <div>
+      <label class="field-label">Keyword density <span class="field-hint">(top words, stop-words excluded)</span></label>
+      <ul class="result-list" id="wc-keywords"></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['word-counter'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+
+    var input   = $('#wc-input', root);
+    var statsEl = $('#wc-stats', root);
+    var timeEl  = $('#wc-time', root);
+    var kwEl    = $('#wc-keywords', root);
+    var SAVE_KEY= 'tool:word-counter:input';
+    var lastStats = {};
+
+    var READ_WPM = 200, SPEAK_WPM = 130;
+    var STOP = ('a an and are as at be by for from has he in is it its of on that the to was were will with ' +
+                'this but or not you your i we they she him her them our us do does did have had can could ' +
+                'would should so if then than too very just about into over after before out up down').split(' ');
+    var STOPSET = {}; STOP.forEach(function (w){ STOPSET[w] = true; });
+
+    /* ---- chip helper ---- */
+    function chip(container, icon, value, label) {
+      container.appendChild(el('span', { class: 'stat-chip' }, [
+        el('i', { class: 'bi ' + icon }),
+        el('strong', { text: String(value) }),
+        document.createTextNode(' ' + label)
+      ]));
+    }
+
+    /* ---- humanize seconds -> "1 min 20 sec" ---- */
+    function fmtDuration(totalSec) {
+      totalSec = Math.round(totalSec);
+      if (totalSec < 1) return '0 sec';
+      var m = Math.floor(totalSec / 60), s = totalSec % 60;
+      if (m && s) return m + ' min ' + s + ' sec';
+      if (m) return m + ' min';
+      return s + ' sec';
+    }
+
+    function analyze() {
+      var text = input.value;
+
+      // words: sequences of letters/digits/apostrophes
+      var wordMatches = text.match(/[A-Za-z0-9']+/g) || [];
+      var words = wordMatches.length;
+      var chars = text.length;
+      var charsNoSpace = text.replace(/\s/g, '').length;
+      var sentences = (text.match(/[^.!?]+[.!?]+/g) || []).filter(function (s){ return s.trim(); }).length;
+      var paragraphs = text.split(/\n{2,}/).filter(function (p){ return p.trim(); }).length;
+      var lines = text === '' ? 0 : text.split('\n').length;
+
+      // averages
+      var totalWordLen = wordMatches.reduce(function (s, w){ return s + w.length; }, 0);
+      var avgWord = words ? (totalWordLen / words).toFixed(1) : 0;
+      var longest = wordMatches.reduce(function (a, w){ return w.length > a.length ? w : a; }, '');
+
+      // primary counts
+      statsEl.innerHTML = '';
+      chip(statsEl, 'bi-fonts', words, 'words');
+      chip(statsEl, 'bi-123', chars, 'characters');
+      chip(statsEl, 'bi-type', charsNoSpace, 'no spaces');
+      chip(statsEl, 'bi-chat-left-text', sentences, 'sentences');
+      chip(statsEl, 'bi-paragraph', paragraphs, 'paragraphs');
+      chip(statsEl, 'bi-list-ol', lines, 'lines');
+
+      // timing + averages
+      timeEl.innerHTML = '';
+      chip(timeEl, 'bi-book', fmtDuration(words / READ_WPM * 60), 'read');
+      chip(timeEl, 'bi-mic', fmtDuration(words / SPEAK_WPM * 60), 'speak');
+      chip(timeEl, 'bi-rulers', avgWord, 'avg length');
+      if (longest) chip(timeEl, 'bi-award', longest.length, 'longest (' + longest + ')');
+
+      // keyword density
+      var freq = {};
+      wordMatches.forEach(function (w) {
+        var k = w.toLowerCase();
+        if (k.length < 3 || STOPSET[k] || /^\d+$/.test(k)) return;
+        freq[k] = (freq[k] || 0) + 1;
+      });
+      var top = Object.keys(freq).map(function (k){ return [k, freq[k]]; })
+        .sort(function (a, b){ return b[1] - a[1]; }).slice(0, 8);
+
+      kwEl.innerHTML = '';
+      if (!top.length) {
+        kwEl.appendChild(el('li', { style:'color:var(--text-subtle);font-family:var(--font-ui)' },
+          ['Type more text to see keyword density…']));
+      } else {
+        top.forEach(function (row) {
+          var pct = words ? ((row[1] / words) * 100).toFixed(1) : 0;
+          kwEl.appendChild(el('li', {}, [
+            el('span', { text: row[0], style:'font-family:var(--font-ui)' }),
+            el('span', { class:'stat-chip', style:'flex:0 0 auto', html:
+              '<strong>' + row[1] + '</strong>&nbsp;× · ' + pct + '%' })
+          ]));
+        });
+      }
+
+      lastStats = { words:words, characters:chars, charsNoSpace:charsNoSpace,
+        sentences:sentences, paragraphs:paragraphs, lines:lines,
+        readTime:fmtDuration(words/READ_WPM*60), speakTime:fmtDuration(words/SPEAK_WPM*60),
+        avgWordLength:avgWord };
+    }
+
+    /* ---- actions ---- */
+    var actions = {
+      sample: function () {
+        input.value = 'Project Taste is a curated collection of developer tools. ' +
+          'Each tool runs entirely in your browser, so your data stays private. ' +
+          'Fast, minimal and open source — built by a developer, for developers.\n\n' +
+          'Taste favours quality over quantity: every utility should feel delightful to use.';
+        analyze(); save();
+      },
+      clear: function () { input.value=''; analyze(); Taste.store.remove(SAVE_KEY); },
+      copystats: function () {
+        var lines = Object.keys(lastStats).map(function (k){ return k + ': ' + lastStats[k]; });
+        lines.length ? Taste.copy(lines.join('\n')) : Taste.toast('Nothing to copy', 'info');
+      }
+    };
+    Taste.on(root, 'click', '[data-act]', function (e, node) {
+      var fn = actions[node.dataset.act]; if (fn) fn();
+    });
+
+    /* ---- live + autosave + dnd ---- */
+    var save = Taste.debounce(function () { Taste.store.set(SAVE_KEY, input.value); }, 400);
+    Taste.on(input, 'input', function () { analyze(); save(); });
+    Taste.dropzone(input, function (t) { input.value = t; analyze(); save(); Taste.toast('File loaded', 'success'); });
+
+    var saved = Taste.store.get(SAVE_KEY, '');
+    if (saved) input.value = saved;
+
+    analyze();
+    input.focus();
+  };
+</script>

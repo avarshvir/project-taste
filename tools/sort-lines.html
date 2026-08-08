@@ -1,0 +1,129 @@
+<!-- =========================================================================
+     Project Taste — tools/sort-lines.html
+     Sort lines alphabetically, numerically, by length, or randomly.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['sort-lines'] = function(root,tool,Taste){}
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-sort-alpha-down"></i></div>
+  <div class="tool-header-text">
+    <h1>Sort Lines</h1>
+    <p>Sort lines alphabetically, numerically, by length or randomly — ascending or descending, with optional case sensitivity. Runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="sl-input">Input <span class="field-hint">(one item per line)</span></label>
+      <textarea id="sl-input" class="textarea-taste" placeholder="Paste lines to sort…" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="sl-output">Output <span class="field-hint" id="sl-meta"></span></label>
+      <textarea id="sl-output" class="textarea-taste" placeholder="Sorted lines appear here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <label class="field-label" style="margin:0 var(--sp-2) 0 0">Sort by</label>
+    <select id="sl-mode" class="select-taste" style="width:auto">
+      <option value="alpha">Alphabetical (A–Z)</option>
+      <option value="numeric">Numeric</option>
+      <option value="length">Line length</option>
+      <option value="random">Random (shuffle)</option>
+    </select>
+    <label class="check-inline"><input type="checkbox" id="sl-desc"> Descending</label>
+    <label class="check-inline"><input type="checkbox" id="sl-case"> Case sensitive</label>
+    <label class="check-inline"><input type="checkbox" id="sl-trim" checked> Ignore blank lines</label>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="run"><i class="bi bi-sort-down"></i> Sort</button>
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    <button class="btn-taste btn-taste-ghost" data-act="swap"><i class="bi bi-arrow-down-up"></i> Swap</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div class="stat-row" id="sl-stats"></div>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['sort-lines'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#sl-input',root), output=$('#sl-output',root), meta=$('#sl-meta',root), stats=$('#sl-stats',root);
+    var modeSel=$('#sl-mode',root), desc=$('#sl-desc',root), caseSens=$('#sl-case',root), skipBlank=$('#sl-trim',root);
+    var SAVE='tool:sort-lines:input';
+
+    // Fisher–Yates shuffle using the CSPRNG when available
+    function shuffle(arr){
+      for (var i=arr.length-1;i>0;i--){
+        var j;
+        if (window.crypto && crypto.getRandomValues){
+          var b=new Uint32Array(1); crypto.getRandomValues(b); j=b[0]%(i+1);
+        } else { j=Math.floor(Math.random()*(i+1)); }
+        var t=arr[i]; arr[i]=arr[j]; arr[j]=t;
+      }
+      return arr;
+    }
+
+    function run(){
+      var lines=input.value.split('\n');
+      if (skipBlank.checked) lines=lines.filter(function(l){ return l.trim()!==''; });
+
+      var mode=modeSel.value, arr=lines.slice();
+      if (mode==='random'){
+        shuffle(arr);
+      } else if (mode==='numeric'){
+        arr.sort(function(a,b){
+          var na=parseFloat(a), nb=parseFloat(b);
+          var va=isNaN(na)?Infinity:na, vb=isNaN(nb)?Infinity:nb;
+          return va-vb;
+        });
+      } else if (mode==='length'){
+        arr.sort(function(a,b){ return a.length-b.length || a.localeCompare(b); });
+      } else { // alpha
+        arr.sort(function(a,b){
+          var x=caseSens.checked?a:a.toLowerCase();
+          var y=caseSens.checked?b:b.toLowerCase();
+          return x.localeCompare(y);
+        });
+      }
+      if (desc.checked && mode!=='random') arr.reverse();
+
+      output.value=arr.join('\n');
+      meta.textContent=arr.length+' lines';
+      renderStats(lines.length, arr.length);
+    }
+
+    function renderStats(input_n, out_n){
+      stats.innerHTML='';
+      [['bi-list-ol', input_n+' input'],['bi-check2', out_n+' output'],['bi-sort-down', modeSel.options[modeSel.selectedIndex].text+'']]
+      .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    var actions={
+      run:run,
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste-sorted.txt',output.value):Taste.toast('Nothing to download','info'); },
+      swap:function(){ if(!output.value)return Taste.toast('No output to swap','info'); input.value=output.value; save(); run(); },
+      sample:function(){ input.value='banana\napple\nCherry\n10\n2\ndate\n1'; run(); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; stats.innerHTML=''; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    [modeSel,desc,caseSens,skipBlank].forEach(function(c){ Taste.on(c,'change',function(){ if(input.value)run(); }); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); run(); Taste.toast('File loaded','success'); });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; run(); }
+    input.focus();
+  };
+</script>

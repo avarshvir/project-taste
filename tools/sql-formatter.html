@@ -1,0 +1,156 @@
+<!-- =========================================================================
+     Project Taste — tools/sql-formatter.html
+     Beautify a single SQL statement: keyword casing + clause indentation.
+     TasteTools contract: window.TasteTools['sql-formatter'] = fn(root,tool,Taste)
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-database-gear"></i></div>
+  <div class="tool-header-text">
+    <h1>SQL Formatter</h1>
+    <p>Beautify a SQL statement with clause-aware line breaks and consistent keyword casing. Runs entirely in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="sf-input">SQL <span class="field-hint">(paste a query)</span></label>
+      <textarea id="sf-input" class="textarea-taste" placeholder="select id,name from users where age>18 order by name" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="sf-output">Formatted <span class="field-hint" id="sf-meta"></span></label>
+      <textarea id="sf-output" class="textarea-taste" placeholder="Formatted SQL appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="format"><i class="bi bi-text-indent-left"></i> Format</button>
+    <label class="field-label" for="sf-case" style="margin:0 var(--sp-1) 0 var(--sp-2)">Keywords</label>
+    <select id="sf-case" class="select-taste" style="width:auto">
+      <option value="upper">UPPERCASE</option>
+      <option value="lower">lowercase</option>
+      <option value="keep">Keep as-is</option>
+    </select>
+    <label class="field-label" for="sf-indent" style="margin:0 var(--sp-1) 0 var(--sp-2)">Indent</label>
+    <select id="sf-indent" class="select-taste" style="width:auto">
+      <option value="2">2 spaces</option>
+      <option value="4">4 spaces</option>
+      <option value="\t">Tab</option>
+    </select>
+  </div>
+
+  <div class="stat-row" id="sf-stats"></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download .sql</button>
+    <button class="btn-taste btn-taste-ghost" data-act="swap"><i class="bi bi-arrow-down-up"></i> Swap</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['sql-formatter'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#sf-input',root), output=$('#sf-output',root), meta=$('#sf-meta',root),
+        stats=$('#sf-stats',root), caseSel=$('#sf-case',root), indentSel=$('#sf-indent',root);
+    var SAVE='tool:sql-formatter:input';
+
+    var NEWLINE_KW=['SELECT','FROM','WHERE','GROUP BY','ORDER BY','HAVING','LIMIT','OFFSET',
+      'INNER JOIN','LEFT JOIN','RIGHT JOIN','FULL JOIN','CROSS JOIN','JOIN','UNION ALL','UNION',
+      'VALUES','SET','INSERT INTO','UPDATE','DELETE FROM','ON','AND','OR'];
+    var KEYWORDS=('SELECT FROM WHERE GROUP BY ORDER BY HAVING LIMIT OFFSET INNER LEFT RIGHT FULL CROSS JOIN '+
+      'ON AND OR NOT IN IS NULL LIKE BETWEEN AS DISTINCT COUNT SUM AVG MIN MAX INSERT INTO VALUES UPDATE SET '+
+      'DELETE CREATE TABLE PRIMARY KEY FOREIGN REFERENCES DEFAULT UNION ALL ASC DESC CASE WHEN THEN ELSE END '+
+      'INT VARCHAR TEXT BOOLEAN DATE TIMESTAMP').split(/\s+/);
+
+    function indentUnit(){ var v=indentSel.value; return v==='\\t'?'\t':' '.repeat(parseInt(v,10)); }
+    function casing(word){
+      if (caseSel.value==='upper') return word.toUpperCase();
+      if (caseSel.value==='lower') return word.toLowerCase();
+      return word;
+    }
+
+    function tokenize(sql){
+      var tokens=[], i=0, n=sql.length;
+      while (i<n){
+        var c=sql[i];
+        if (/\s/.test(c)){ i++; continue; }
+        if (c==='-'&&sql[i+1]==='-'){ var e=sql.indexOf('\n',i); e=e<0?n:e; tokens.push({t:'comment',v:sql.slice(i,e)}); i=e; continue; }
+        if (c==='/'&&sql[i+1]==='*'){ var e2=sql.indexOf('*/',i); e2=e2<0?n:e2+2; tokens.push({t:'comment',v:sql.slice(i,e2)}); i=e2; continue; }
+        if (c==="'"||c==='"'||c==='`'){ var j=i+1; while(j<n&&sql[j]!==c){ if(sql[j]==='\\')j++; j++; } tokens.push({t:'string',v:sql.slice(i,j+1)}); i=j+1; continue; }
+        if (/[(),;]/.test(c)){ tokens.push({t:'punct',v:c}); i++; continue; }
+        var m=/^[A-Za-z0-9_.$]+/.exec(sql.slice(i));
+        if (m){ tokens.push({t:'word',v:m[0]}); i+=m[0].length; continue; }
+        var op=/^(<=|>=|<>|!=|=|<|>|\+|\-|\*|\/|%)/.exec(sql.slice(i));
+        if (op){ tokens.push({t:'op',v:op[0]}); i+=op[0].length; continue; }
+        tokens.push({t:'other',v:c}); i++;
+      }
+      return tokens;
+    }
+
+    function format(sql){
+      var tokens=tokenize(sql);
+      var unit=indentUnit();
+      var out='', depth=0, lineStarted=false;
+      function nl(){ out=out.replace(/\s+$/,'')+'\n'+unit.repeat(depth); lineStarted=false; }
+
+      for (var i=0;i<tokens.length;i++){
+        var tk=tokens[i];
+        if (tk.t==='comment'){ out+=(lineStarted?' ':'')+tk.v; nl(); continue; }
+        if (tk.t==='string'){ out+=(lineStarted?' ':'')+tk.v; lineStarted=true; continue; }
+        if (tk.t==='punct'){
+          if (tk.v==='('){ out+='('; depth++; continue; }
+          if (tk.v===')'){ depth=Math.max(0,depth-1); out=out.replace(/\s+$/,'')+')'; lineStarted=true; continue; }
+          if (tk.v===','){ out=out.replace(/\s+$/,'')+','; nl(); continue; }
+          if (tk.v===';'){ out=out.replace(/\s+$/,'')+';\n'; lineStarted=false; continue; }
+        }
+        if (tk.t==='word'){
+          var w1=tk.v.toUpperCase();
+          var w2=tokens[i+1]&&tokens[i+1].t==='word'?(w1+' '+tokens[i+1].v.toUpperCase()):null;
+          var matched2=w2&&NEWLINE_KW.indexOf(w2)!==-1;
+          if (matched2){ if (out.trim()!=='') nl(); out+=casing(w2); i++; lineStarted=true; continue; }
+          if (NEWLINE_KW.indexOf(w1)!==-1){ if (out.trim()!=='') nl(); out+=casing(w1); lineStarted=true; continue; }
+          var isKw=KEYWORDS.indexOf(w1)!==-1;
+          out+=(lineStarted?' ':'')+(isKw?casing(tk.v):tk.v); lineStarted=true; continue;
+        }
+        out+=(lineStarted?' ':'')+tk.v; lineStarted=true;
+      }
+      return out.replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+    }
+
+    function run(){
+      var raw=input.value.trim(); stats.innerHTML='';
+      if(!raw){ output.value=''; meta.textContent=''; Taste.toast('Paste some SQL first','info'); return; }
+      var result=format(raw);
+      output.value=result;
+      meta.textContent=result.split('\n').length+' lines';
+      [['bi-list-ol', result.split('\n').length+' lines'],['bi-hdd', Taste.bytes(new Blob([result]).size)]]
+      .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    var actions={
+      format:run,
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste.sql',output.value,'text/plain'):Taste.toast('Nothing to download','info'); },
+      swap:function(){ if(!output.value)return Taste.toast('No output to swap','info'); input.value=output.value; save(); },
+      sample:function(){ input.value="select u.id, u.name, count(o.id) as orders from users u left join orders o on o.user_id=u.id where u.active=1 and u.age>18 group by u.id, u.name having count(o.id)>0 order by orders desc limit 10;"; run(); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; stats.innerHTML=''; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    [caseSel,indentSel].forEach(function(c){ Taste.on(c,'change',function(){ if(output.value)run(); }); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); run(); },{accept:/sql|text/});
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); run(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

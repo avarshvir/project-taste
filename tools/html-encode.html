@@ -1,0 +1,111 @@
+<!-- =========================================================================
+     Project Taste — tools/html-encode.html
+     Encode / decode HTML entities.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['html-encode'] = function(root,tool,Taste){}
+
+     Encoding escapes the HTML-significant characters (& < > " ') plus an
+     optional "all non-ASCII → numeric entity" mode. Decoding uses a detached
+     textarea so the browser's own entity table resolves named entities
+     (&copy;, &mdash;, &amp; …) correctly — no giant hardcoded map needed.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-code"></i></div>
+  <div class="tool-header-text">
+    <h1>HTML Encode / Decode</h1>
+    <p>Escape text into safe HTML entities or decode entities back to plain text — including named entities like <code>&amp;copy;</code>. Runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="he-input">Input</label>
+      <textarea id="he-input" class="textarea-taste" placeholder="Type text or HTML entities…" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="he-output">Output <span class="field-hint" id="he-meta"></span></label>
+      <textarea id="he-output" class="textarea-taste" placeholder="Result appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="encode"><i class="bi bi-arrow-right-square"></i> Encode</button>
+    <button class="btn-taste btn-taste-primary" data-act="decode"><i class="bi bi-arrow-left-square"></i> Decode</button>
+    <label class="check-inline"><input type="checkbox" id="he-all"> Encode all non-ASCII</label>
+    <label class="check-inline"><input type="checkbox" id="he-numeric"> Numeric entities (&amp;#NN;)</label>
+    <button class="btn-taste btn-taste-secondary" data-act="swap"><i class="bi bi-arrow-down-up"></i> Swap</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+  </div>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['html-encode'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$;
+    var input=$('#he-input',root), output=$('#he-output',root), meta=$('#he-meta',root),
+        allChk=$('#he-all',root), numChk=$('#he-numeric',root);
+    var SAVE='tool:html-encode:input';
+
+    var BASE={ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' };
+    var NAMED={ '&':'amp', '<':'lt', '>':'gt', '"':'quot' }; // 'named' preference for the core set
+
+    function encode(str){
+      var out='';
+      for (var i=0;i<str.length;i++){
+        var ch=str[i], code=str.charCodeAt(i);
+        if (BASE[ch]!==undefined){
+          out += numChk.checked ? '&#'+code+';' : BASE[ch];
+        } else if (allChk.checked && code>127){
+          // handle surrogate pairs → real code point
+          var cp=str.codePointAt(i);
+          if (cp>0xFFFF) i++;
+          out += numChk.checked ? '&#'+cp+';' : '&#'+cp+';';
+        } else {
+          out += ch;
+        }
+      }
+      return out;
+    }
+
+    // Decode via a detached textarea so the browser resolves ALL entities
+    var scratch=document.createElement('textarea');
+    function decode(str){
+      scratch.innerHTML=str.replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        // but keep entities intact: re-expose &... sequences
+        .replace(/&lt;/g,'<').replace(/&gt;/g,'>'); // no-op guard; real work below
+      scratch.innerHTML=str;
+      return scratch.value;
+    }
+
+    function setOut(t){ output.value=t; meta.textContent=t?(t.length+' chars'):''; }
+
+    var actions={
+      encode:function(){ if(!input.value)return Taste.toast('Nothing to encode','info'); setOut(encode(input.value)); },
+      decode:function(){ if(!input.value)return Taste.toast('Nothing to decode','info'); setOut(decode(input.value)); },
+      swap:function(){ if(!output.value)return Taste.toast('No output to swap','info'); input.value=output.value; setOut(''); save(); },
+      sample:function(){ input.value='<a href="x?a=1&b=2">Café — "Taste" ©</a>'; actions.encode(); save(); },
+      clear:function(){ input.value=''; setOut(''); Taste.store.remove(SAVE); },
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste-html.txt',output.value):Taste.toast('Nothing to download','info'); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    [allChk,numChk].forEach(function(c){ Taste.on(c,'change',function(){ if(output.value&&input.value)actions.encode(); }); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); },{accept:/html|text/});
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); actions.encode(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

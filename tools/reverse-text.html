@@ -1,0 +1,106 @@
+<!-- =========================================================================
+     Project Taste — tools/reverse-text.html
+     Reverse text by characters, words, or line order.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['reverse-text'] = function(root,tool,Taste){}
+
+     Note: character reversal is Unicode-AWARE — it uses Array.from / the
+     spread operator so surrogate pairs (emoji, some CJK) don't get mangled.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-arrow-left-right"></i></div>
+  <div class="tool-header-text">
+    <h1>Reverse Text</h1>
+    <p>Reverse text by characters, words or line order — Unicode-safe so emoji and accents stay intact. Runs entirely in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="rv-input">Input <span class="field-hint">(type or paste — reverses live)</span></label>
+    <textarea id="rv-input" class="textarea-taste" placeholder="Type something to reverse…" spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <label class="field-label" style="margin:0 var(--sp-2) 0 0">Mode</label>
+    <div class="seg" role="tablist" aria-label="Reverse mode">
+      <button class="seg-btn is-active" data-mode="chars" role="tab"><i class="bi bi-type"></i> Characters</button>
+      <button class="seg-btn" data-mode="words" role="tab"><i class="bi bi-fonts"></i> Words</button>
+      <button class="seg-btn" data-mode="lines" role="tab"><i class="bi bi-list-ol"></i> Lines</button>
+    </div>
+    <label class="check-inline"><input type="checkbox" id="rv-perline"> Per line</label>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="rv-output">Output <span class="field-hint" id="rv-meta"></span></label>
+    <textarea id="rv-output" class="textarea-taste" placeholder="Reversed text appears here…" readonly spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    <button class="btn-taste btn-taste-ghost" data-act="swap"><i class="bi bi-arrow-down-up"></i> Swap</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['reverse-text'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, $$ = Taste.$$;
+    var input=$('#rv-input',root), output=$('#rv-output',root), meta=$('#rv-meta',root), perLine=$('#rv-perline',root);
+    var mode='chars', SAVE='tool:reverse-text:input';
+
+    // Unicode-aware character reversal (handles emoji / surrogate pairs)
+    function revChars(s){ return Array.from(s).reverse().join(''); }
+    function revWords(s){ return s.split(/(\s+)/).reverse().join(''); }
+
+    function transformLine(line){
+      if (mode==='chars') return revChars(line);
+      if (mode==='words') return revWords(line);
+      return line; // 'lines' handled at the block level
+    }
+
+    function run(){
+      var text = input.value;
+      var result;
+      if (mode==='lines' && !perLine.checked) {
+        result = text.split('\n').reverse().join('\n');
+      } else if (perLine.checked || mode!=='lines') {
+        result = text.split('\n').map(transformLine).join('\n');
+      } else {
+        result = text.split('\n').reverse().join('\n');
+      }
+      output.value = result;
+      meta.textContent = Array.from(text).length + ' chars';
+    }
+
+    var actions={
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste-reversed.txt',output.value):Taste.toast('Nothing to download','info'); },
+      swap:function(){ if(!output.value)return Taste.toast('No output to swap','info'); input.value=output.value; save(); run(); },
+      sample:function(){ input.value='Project Taste 🍋\nBuilt for developers'; run(); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+
+    Taste.on(root,'click','.seg-btn',function(e,node){
+      mode=node.dataset.mode;
+      $$('.seg-btn',root).forEach(function(b){ b.classList.toggle('is-active', b===node); });
+      // "Per line" only meaningful for chars/words; disable visually for lines
+      perLine.disabled = (mode==='lines');
+      run();
+    });
+    Taste.on(perLine,'change',run);
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',function(){ run(); save(); });
+    Taste.dropzone(input,function(t){ input.value=t; run(); save(); Taste.toast('File loaded','success'); });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    run(); input.focus();
+  };
+</script>

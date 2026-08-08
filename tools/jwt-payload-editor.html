@@ -1,0 +1,140 @@
+<!-- =========================================================================
+     Project Taste — tools/jwt-payload-editor.html
+     Decode a JWT, edit its payload, then re-encode into a new token.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['jwt-payload-editor'] = function(root,tool,Taste){}
+
+     Distinct from the others: an EDIT round-trip. Paste a token → its
+     payload appears editable → tweak the JSON → re-encode. The header is
+     preserved. NOTE: re-encoding does NOT re-sign, so the signature becomes
+     invalid (clearly warned) — this is for crafting test tokens / debugging,
+     not for producing valid signed tokens (use JWT Generator for that).
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-pencil-square"></i></div>
+  <div class="tool-header-text">
+    <h1>JWT Payload Editor</h1>
+    <p>Decode a token, edit its payload JSON, and re-encode a new one — perfect for crafting test tokens. Runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="jp-token">Token in</label>
+    <textarea id="jp-token" class="textarea-taste" style="min-height:90px" placeholder="Paste a JWT to load its payload…" spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-secondary" data-act="load"><i class="bi bi-box-arrow-in-down"></i> Load payload</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="jp-payload">Payload (editable) <span class="field-hint" id="jp-valid"></span></label>
+      <textarea id="jp-payload" class="textarea-taste" placeholder="Decoded payload appears here — edit freely…" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="jp-out">Re-encoded token <span class="field-hint" id="jp-meta"></span></label>
+      <textarea id="jp-out" class="textarea-taste" placeholder="New token appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="jx-status ji-warn" style="display:flex">
+    <i class="bi bi-shield-exclamation"></i>
+    <span>Re-encoding does <strong>not</strong> re-sign the token — the signature will be invalid. For a properly signed token, use <strong>JWT Generator</strong>.</span>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="encode"><i class="bi bi-arrow-repeat"></i> Re-encode</button>
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy Token</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+  </div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); align-items:center; gap:var(--sp-2); }
+  .ji-warn { background:var(--badge-hot-bg); color:var(--badge-hot-text); }
+  .ji-warn .bi { font-size:var(--fs-md); }
+  .jp-ok { color:var(--success); }
+  .jp-bad { color:var(--danger); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['jwt-payload-editor'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$;
+    var tokenEl=$('#jp-token',root), payloadEl=$('#jp-payload',root), outEl=$('#jp-out',root),
+        validEl=$('#jp-valid',root), meta=$('#jp-meta',root);
+    var SAVE='tool:jwt-payload-editor:token';
+    var headerB64='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9';  // default header if none loaded
+    var origSig='';
+
+    function b64urlDecode(part){
+      var s=part.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='=';
+      var bin=atob(s); var bytes=new Uint8Array(bin.length);
+      for(var i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+      return new TextDecoder().decode(bytes);
+    }
+    function b64urlEncode(str){
+      var bytes=new TextEncoder().encode(str), bin='';
+      for(var i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+      return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    }
+    function pretty(s){ try{ return JSON.stringify(JSON.parse(s),null,2); }catch(e){ return s; } }
+
+    function load(){
+      var raw=tokenEl.value.trim();
+      if(!raw){ Taste.toast('Paste a token first','info'); return; }
+      var parts=raw.split('.');
+      if(parts.length<2){ Taste.toast('Not a valid JWT','error'); return; }
+      try{
+        headerB64=parts[0];
+        origSig=parts[2]||'';
+        payloadEl.value=pretty(b64urlDecode(parts[1]));
+        validate();
+        Taste.toast('Payload loaded — edit away','success');
+        encode();
+      }catch(e){ Taste.toast('Could not decode token','error'); }
+    }
+
+    function validate(){
+      try{ JSON.parse(payloadEl.value); validEl.innerHTML='<span class="jp-ok">valid JSON ✓</span>'; return true; }
+      catch(e){ validEl.innerHTML='<span class="jp-bad">invalid JSON</span>'; return false; }
+    }
+
+    function encode(){
+      if(!payloadEl.value.trim()){ Taste.toast('Nothing to encode','info'); return; }
+      if(!validate()){ Taste.toast('Fix the JSON first','error'); return; }
+      var payloadB64=b64urlEncode(JSON.stringify(JSON.parse(payloadEl.value)));
+      var token=headerB64+'.'+payloadB64+'.'+(origSig||'unsigned');
+      outEl.value=token;
+      meta.textContent=token.length+' chars';
+    }
+
+    var actions={
+      load:load,
+      encode:encode,
+      copy:function(){ Taste.copy(outEl.value); },
+      download:function(){ outEl.value?Taste.download('taste-edited.jwt',outEl.value):Taste.toast('Re-encode first','info'); },
+      sample:function(){ tokenEl.value='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0IiwibmFtZSI6IkFyc2h2aXIiLCJyb2xlIjoidXNlciJ9.abc'; load(); save(); },
+      clear:function(){ tokenEl.value=''; payloadEl.value=''; outEl.value=''; validEl.textContent=''; meta.textContent=''; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+
+    // live: re-validate + re-encode as you edit the payload
+    var reenc=Taste.debounce(function(){ if(payloadEl.value.trim()){ if(validate()) encode(); } },300);
+    Taste.on(payloadEl,'input',reenc);
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,tokenEl.value); },400);
+    Taste.on(tokenEl,'input',save);
+    Taste.dropzone(tokenEl,function(t){ tokenEl.value=t.trim(); save(); load(); });
+    var saved=Taste.store.get(SAVE,''); if(saved){ tokenEl.value=saved; }
+    tokenEl.focus();
+  };
+</script>

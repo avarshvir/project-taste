@@ -1,0 +1,104 @@
+<!-- =========================================================================
+     Project Taste — tools/slug-generator.html
+     Turn any text into a clean, URL-safe slug.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['slug-generator'] = function(root,tool,Taste){}
+
+     Uses Unicode normalization (NFKD) + diacritic stripping so accented
+     characters (café → cafe) become clean ASCII slugs. Fully generic.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-link"></i></div>
+  <div class="tool-header-text">
+    <h1>Slug Generator</h1>
+    <p>Convert titles and phrases into clean, URL-friendly slugs — with accent stripping and a configurable separator. Runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="sg-input">Input <span class="field-hint">(one title per line for bulk slugs)</span></label>
+    <textarea id="sg-input" class="textarea-taste" style="min-height:120px"
+      placeholder="e.g. Café del Mar — 10 Best Tracks (2026)!" spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <label class="field-label" style="margin:0 var(--sp-2) 0 0">Separator</label>
+    <select id="sg-sep" class="select-taste" style="width:auto">
+      <option value="-">Hyphen ( - )</option>
+      <option value="_">Underscore ( _ )</option>
+      <option value=".">Dot ( . )</option>
+    </select>
+    <label class="check-inline"><input type="checkbox" id="sg-lower" checked> Lowercase</label>
+    <label class="check-inline"><input type="checkbox" id="sg-accent" checked> Strip accents</label>
+    <label class="check-inline"><input type="checkbox" id="sg-strip"> Remove stop-words</label>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="sg-output">Slug <span class="field-hint" id="sg-meta"></span></label>
+    <textarea id="sg-output" class="textarea-taste" style="min-height:100px" placeholder="your-clean-slug-here" readonly spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['slug-generator'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$;
+    var input=$('#sg-input',root), output=$('#sg-output',root), meta=$('#sg-meta',root);
+    var sepSel=$('#sg-sep',root), lower=$('#sg-lower',root), accent=$('#sg-accent',root), stripStop=$('#sg-strip',root);
+    var SAVE='tool:slug-generator:input';
+    var STOP=('a an and or the of to in on for with at by from is are as').split(' ');
+    var STOPSET={}; STOP.forEach(function(w){ STOPSET[w]=true; });
+
+    function slugify(text){
+      var sep=sepSel.value;
+      var s=text;
+      if (accent.checked){
+        // NFKD splits accented chars into base + combining mark, then strip marks
+        s=s.normalize('NFKD').replace(/[\u0300-\u036f]/g,'');
+      }
+      if (lower.checked) s=s.toLowerCase();
+      // split into word tokens (letters/digits)
+      var words=s.split(/[^A-Za-z0-9]+/).filter(Boolean);
+      if (stripStop.checked && words.length>1){
+        var kept=words.filter(function(w){ return !STOPSET[w.toLowerCase()]; });
+        if (kept.length) words=kept;   // never strip everything
+      }
+      return words.join(sep);
+    }
+
+    function run(){
+      var lines=input.value.split('\n');
+      var slugs=lines.map(function(l){ return l.trim()===''?'':slugify(l); });
+      // drop empty results but keep alignment feel: filter blanks
+      var out=slugs.filter(function(s){ return s!==''; });
+      output.value=out.join('\n');
+      meta.textContent = out.length? (out.length+' slug'+(out.length===1?'':'s')+' · '+output.value.length+' chars') : '';
+    }
+
+    var actions={
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste-slugs.txt',output.value):Taste.toast('Nothing to download','info'); },
+      sample:function(){ input.value='Café del Mar — 10 Best Tracks (2026)!\n   Hello,  World: A Developer\u2019s Guide  '; run(); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    [sepSel,lower,accent,stripStop].forEach(function(c){ Taste.on(c,'change',function(){ if(input.value)run(); }); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',function(){ run(); save(); });
+    Taste.dropzone(input,function(t){ input.value=t; run(); save(); Taste.toast('File loaded','success'); });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    run(); input.focus();
+  };
+</script>

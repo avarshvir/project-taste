@@ -1,0 +1,141 @@
+<!-- =========================================================================
+     Project Taste — tools/character-counter.html
+     Live character counter with byte, whitespace and limit tracking.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['character-counter'] = function(root,tool,Taste){}
+
+     Character count is Unicode-AWARE (Array.from), so emoji count as one
+     "character" while the byte count reflects true UTF-8 size.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-fonts"></i></div>
+  <div class="tool-header-text">
+    <h1>Character Counter</h1>
+    <p>Live character, byte and whitespace counts — with an optional limit for tweets, meta descriptions or SMS. Everything stays in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="cch-input">Text <span class="field-hint">(type or paste — counts update live)</span></label>
+    <textarea id="cch-input" class="textarea-taste" style="min-height:180px"
+      placeholder="Start typing…" spellcheck="false"></textarea>
+  </div>
+
+  <!-- character limit tracker -->
+  <div class="toolbar">
+    <label class="field-label" for="cch-limit" style="margin:0 var(--sp-2) 0 0">Limit</label>
+    <input type="number" id="cch-limit" class="input-taste" style="width:110px" min="0" placeholder="e.g. 280" />
+    <div class="cch-presets">
+      <button class="btn-taste btn-taste-ghost btn-taste-sm" data-limit="280">Tweet 280</button>
+      <button class="btn-taste btn-taste-ghost btn-taste-sm" data-limit="160">SMS 160</button>
+      <button class="btn-taste btn-taste-ghost btn-taste-sm" data-limit="160">Meta 160</button>
+      <button class="btn-taste btn-taste-ghost btn-taste-sm" data-limit="0">None</button>
+    </div>
+  </div>
+
+  <div class="cch-bar" id="cch-barwrap" hidden>
+    <div class="pw-bar"><span id="cch-barfill"></span></div>
+    <div class="cch-barlabel" id="cch-barlabel"></div>
+  </div>
+
+  <div class="stat-row" id="cch-stats"></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+    <button class="btn-taste btn-taste-secondary" data-act="copystats"><i class="bi bi-clipboard-check"></i> Copy Stats</button>
+  </div>
+</div>
+
+<style>
+  .cch-presets { display:flex; gap:var(--sp-1); flex-wrap:wrap; }
+  .cch-bar { margin:var(--sp-3) 0; }
+  .pw-bar { height:8px; background:var(--bg-subtle); border:1px solid var(--border); border-radius:var(--radius-full); overflow:hidden; }
+  .pw-bar span { display:block; height:100%; width:0; background:var(--accent); border-radius:var(--radius-full);
+    transition:width var(--dur-base) var(--ease), background-color var(--dur-base) var(--ease); }
+  .cch-barlabel { margin-top:var(--sp-2); font-size:var(--fs-sm); color:var(--text-muted); }
+  .cch-barlabel strong { color:var(--text); }
+  .cch-over { color:var(--danger) !important; }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['character-counter'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#cch-input',root), stats=$('#cch-stats',root), limitEl=$('#cch-limit',root);
+    var barWrap=$('#cch-barwrap',root), barFill=$('#cch-barfill',root), barLabel=$('#cch-barlabel',root);
+    var SAVE='tool:character-counter:input', LIMSAVE='tool:character-counter:limit';
+    var lastStats={};
+
+    function chip(icon,value,label){
+      stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+icon}), el('strong',{text:String(value)}),
+        document.createTextNode(' '+label)]));
+    }
+
+    function analyze(){
+      var text=input.value;
+      var chars=Array.from(text).length;          // Unicode-aware
+      var noSpace=Array.from(text.replace(/\s/g,'')).length;
+      var spaces=chars-noSpace;
+      var words=(text.match(/[^\s]+/g)||[]).length;
+      var lines=text===''?0:text.split('\n').length;
+      var bytes=new Blob([text]).size;
+
+      stats.innerHTML='';
+      chip('bi-123', chars, 'characters');
+      chip('bi-type', noSpace, 'no spaces');
+      chip('bi-hr', spaces, 'whitespace');
+      chip('bi-fonts', words, 'words');
+      chip('bi-list-ol', lines, 'lines');
+      chip('bi-hdd', Taste.bytes(bytes), 'UTF-8');
+
+      updateLimit(chars);
+      lastStats={characters:chars, charactersNoSpaces:noSpace, whitespace:spaces, words:words, lines:lines, bytes:bytes};
+    }
+
+    function updateLimit(chars){
+      var lim=parseInt(limitEl.value,10);
+      if (!lim || lim<=0){ barWrap.hidden=true; return; }
+      barWrap.hidden=false;
+      var pct=Math.min(100,(chars/lim)*100);
+      var over=chars>lim;
+      barFill.style.width=pct+'%';
+      barFill.style.background=over?'var(--danger)':(pct>90?'var(--warning)':'var(--accent)');
+      barLabel.innerHTML='<strong'+(over?' class="cch-over"':'')+'>'+chars+'</strong> / '+lim+
+        ' · '+(over?('<span class="cch-over">'+(chars-lim)+' over</span>'):((lim-chars)+' remaining'));
+    }
+
+    var actions={
+      sample:function(){ input.value='Project Taste 🍋 — a curated toolkit for developers. Fast, private, and delightful to use.'; analyze(); save(); },
+      clear:function(){ input.value=''; analyze(); Taste.store.remove(SAVE); },
+      copystats:function(){
+        var lines=Object.keys(lastStats).map(function(k){ return k+': '+lastStats[k]; });
+        lines.length?Taste.copy(lines.join('\n')):Taste.toast('Nothing to copy','info');
+      }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+
+    // Limit presets
+    Taste.on(root,'click','[data-limit]',function(e,node){
+      var v=node.dataset.limit;
+      limitEl.value = v==='0'?'':v;
+      Taste.store.set(LIMSAVE, limitEl.value);
+      analyze();
+    });
+    Taste.on(limitEl,'input',function(){ Taste.store.set(LIMSAVE, limitEl.value); analyze(); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',function(){ analyze(); save(); });
+    Taste.dropzone(input,function(t){ input.value=t; analyze(); save(); Taste.toast('File loaded','success'); });
+
+    var saved=Taste.store.get(SAVE,''); if(saved) input.value=saved;
+    var savedLim=Taste.store.get(LIMSAVE,''); if(savedLim) limitEl.value=savedLim;
+
+    analyze(); input.focus();
+  };
+</script>

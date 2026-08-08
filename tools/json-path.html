@@ -1,0 +1,212 @@
+<!-- =========================================================================
+     Project Taste — tools/json-path.html
+     Query JSON with a JSONPath-style expression.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['json-path'] = function(root,tool,Taste){}
+
+     A compact, dependency-free JSONPath evaluator supporting the common
+     subset:
+        $              root
+        .key / ['key'] child (dot or bracket)
+        [n]            array index (negative allowed)
+        [*] / .*       wildcard over array/object values
+        ..key          recursive descent to a key
+        [start:end]    array slice
+     Results are returned as a list of matches with their concrete paths.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-diagram-2"></i></div>
+  <div class="tool-header-text">
+    <h1>JSON Path</h1>
+    <p>Query a JSON document with JSONPath expressions and see every match with its concrete path. Runs entirely in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="jpath-input">JSON <span class="field-hint">(paste or drag &amp; drop)</span></label>
+    <textarea id="jpath-input" class="textarea-taste" style="min-height:150px" placeholder='{"store":{"books":[{"title":"A","price":5},{"title":"B","price":9}]}}' spellcheck="false"></textarea>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="jpath-query">JSONPath</label>
+    <div class="input-row">
+      <input type="text" id="jpath-query" class="input-taste" placeholder="$.store.books[*].title" spellcheck="false" value="$..title">
+      <button class="btn-taste btn-taste-primary" data-act="run"><i class="bi bi-search"></i> Query</button>
+    </div>
+    <div class="jpath-hints">
+      <button class="jpath-chip" data-q="$..title">$..title</button>
+      <button class="jpath-chip" data-q="$.store.books[*].price">books[*].price</button>
+      <button class="jpath-chip" data-q="$.store.books[0]">books[0]</button>
+      <button class="jpath-chip" data-q="$.store.books[-1]">books[-1]</button>
+      <button class="jpath-chip" data-q="$.store.books[0:1]">books[0:1]</button>
+    </div>
+  </div>
+
+  <div id="jpath-status" class="jx-status" hidden></div>
+  <div class="stat-row" id="jpath-stats"></div>
+
+  <label class="field-label">Matches</label>
+  <div class="code-output" id="jpath-out" style="min-height:80px">Run a query to see matches.</div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy Matches</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin:var(--sp-2) 0 var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .jx-status.ok  { background:var(--badge-new-bg); color:var(--badge-new-text); }
+  .jpath-hints { display:flex; gap:var(--sp-1); flex-wrap:wrap; margin-top:var(--sp-2); }
+  .jpath-chip { font-family:var(--font-mono); font-size:var(--fs-xs); padding:.15em .6em; cursor:pointer;
+    color:var(--text-muted); background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-full); }
+  .jpath-chip:hover { color:var(--accent); border-color:var(--accent); }
+  .jpath-match { padding:var(--sp-1) 0; border-bottom:1px dashed var(--border); }
+  .jpath-match:last-child { border-bottom:none; }
+  .jpath-mpath { color:var(--accent); }
+  .jpath-mval  { color:var(--code-text); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['json-path'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#jpath-input',root), queryEl=$('#jpath-query',root), out=$('#jpath-out',root),
+        statusEl=$('#jpath-status',root), stats=$('#jpath-stats',root);
+    var SAVE='tool:json-path:input', QSAVE='tool:json-path:query';
+    var lastMatches=[];
+
+    /* ---- tokenize a JSONPath expression into steps ---- */
+    function tokenize(path){
+      var steps=[]; var i=0;
+      if (path[0]==='$') i=1;
+      while (i<path.length){
+        var c=path[i];
+        if (c==='.'){
+          if (path[i+1]==='.'){ steps.push({type:'recurse'}); i+=2;
+            // optional key right after ..
+            var m=/^[A-Za-z0-9_\-*]+/.exec(path.slice(i));
+            if (m){ steps.push(m[0]==='*'?{type:'wildcard'}:{type:'key',key:m[0]}); i+=m[0].length; }
+            continue;
+          }
+          i++; // single dot
+          var mm=/^[A-Za-z0-9_\-*]+/.exec(path.slice(i));
+          if (mm){ steps.push(mm[0]==='*'?{type:'wildcard'}:{type:'key',key:mm[0]}); i+=mm[0].length; }
+          continue;
+        }
+        if (c==='['){
+          var end=path.indexOf(']', i);
+          var inner=path.slice(i+1, end).trim();
+          if (inner==='*'){ steps.push({type:'wildcard'}); }
+          else if (/^-?\d+$/.test(inner)){ steps.push({type:'index', index:parseInt(inner,10)}); }
+          else if (/^-?\d*:-?\d*$/.test(inner)){ var parts=inner.split(':');
+            steps.push({type:'slice', start:parts[0]===''?null:parseInt(parts[0],10), end:parts[1]===''?null:parseInt(parts[1],10)}); }
+          else { steps.push({type:'key', key:inner.replace(/^['"]|['"]$/g,'')}); }
+          i=end+1; continue;
+        }
+        i++;
+      }
+      return steps;
+    }
+
+    /* ---- evaluate steps, tracking concrete paths ---- */
+    function evaluate(data, steps){
+      var current=[{path:'$', value:data}];
+      steps.forEach(function(step){
+        var next=[];
+        current.forEach(function(node){
+          var v=node.value;
+          if (step.type==='key'){
+            if (v && typeof v==='object' && !Array.isArray(v) && Object.prototype.hasOwnProperty.call(v,step.key))
+              next.push({path:node.path+'.'+step.key, value:v[step.key]});
+          } else if (step.type==='index'){
+            if (Array.isArray(v)){ var idx=step.index<0?v.length+step.index:step.index;
+              if (idx>=0&&idx<v.length) next.push({path:node.path+'['+idx+']', value:v[idx]}); }
+          } else if (step.type==='slice'){
+            if (Array.isArray(v)){ var s=step.start==null?0:(step.start<0?v.length+step.start:step.start);
+              var e=step.end==null?v.length:(step.end<0?v.length+step.end:step.end);
+              for (var k=s;k<e&&k<v.length;k++) if(k>=0) next.push({path:node.path+'['+k+']', value:v[k]}); }
+          } else if (step.type==='wildcard'){
+            if (Array.isArray(v)) v.forEach(function(item,k){ next.push({path:node.path+'['+k+']', value:item}); });
+            else if (v && typeof v==='object') Object.keys(v).forEach(function(k){ next.push({path:node.path+'.'+k, value:v[k]}); });
+          } else if (step.type==='recurse'){
+            // collect self + all descendants
+            (function walk(val, p){
+              next.push({path:p, value:val});
+              if (Array.isArray(val)) val.forEach(function(item,k){ walk(item, p+'['+k+']'); });
+              else if (val && typeof val==='object') Object.keys(val).forEach(function(k){ walk(val[k], p+'.'+k); });
+            })(v, node.path);
+          }
+        });
+        current=next;
+      });
+      return current;
+    }
+
+    function setStatus(kind,msg){ statusEl.hidden=false; statusEl.className='jx-status '+kind;
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi '+(kind==='ok'?'bi-check-circle-fill':'bi-exclamation-triangle-fill')}));
+      statusEl.appendChild(el('span',{text:msg})); }
+
+    function run(){
+      var raw=input.value.trim(); stats.innerHTML='';
+      if(!raw){ Taste.toast('Paste some JSON first','info'); return; }
+      var data;
+      try{ data=JSON.parse(raw); }
+      catch(e){ setStatus('err','Invalid JSON: '+e.message); out.textContent=''; Taste.toast('Invalid JSON','error'); return; }
+
+      var expr=queryEl.value.trim()||'$';
+      var matches;
+      try{
+        // recurse-with-key produces intermediate recurse nodes; filter to the last step semantics
+        matches=evaluate(data, tokenize(expr));
+      }catch(e){ setStatus('err','Bad expression: '+e.message); out.textContent=''; return; }
+
+      lastMatches=matches;
+      out.innerHTML='';
+      if(!matches.length){ setStatus('err','No matches for '+expr); out.textContent='(no matches)'; return; }
+      setStatus('ok', matches.length+' match'+(matches.length===1?'':'es')+' for '+expr);
+      matches.forEach(function(m){
+        out.appendChild(el('div',{class:'jpath-match'},[
+          el('span',{class:'jpath-mpath',text:m.path}),
+          document.createTextNode('  =  '),
+          el('span',{class:'jpath-mval',text:JSON.stringify(m.value)})
+        ]));
+      });
+      [['bi-bullseye', matches.length+' matches'],['bi-code-slash', expr]]
+      .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    function matchesText(){ return lastMatches.map(function(m){ return m.path+' = '+JSON.stringify(m.value); }).join('\n'); }
+
+    var actions={
+      run:run,
+      copy:function(){ lastMatches.length?Taste.copy(matchesText()):Taste.toast('Nothing to copy','info'); },
+      download:function(){ lastMatches.length?Taste.download('taste-jsonpath.txt',matchesText()):Taste.toast('Nothing to download','info'); },
+      sample:function(){ input.value='{\n  "store": {\n    "books": [\n      {"title":"A","price":5},\n      {"title":"B","price":9},\n      {"title":"C","price":12}\n    ],\n    "open": true\n  }\n}'; queryEl.value='$..title'; run(); save(); },
+      clear:function(){ input.value=''; out.textContent='Run a query to see matches.'; stats.innerHTML=''; statusEl.hidden=true; lastMatches=[]; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    Taste.on(root,'click','.jpath-chip',function(e,node){ queryEl.value=node.dataset.q; run(); saveQ(); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    var saveQ=Taste.debounce(function(){ Taste.store.set(QSAVE,queryEl.value); },400);
+    Taste.on(input,'input',save);
+    Taste.on(queryEl,'input',saveQ);
+    Taste.on(queryEl,'keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); run(); } });
+    Taste.dropzone(input,function(t){ input.value=t; save(); run(); },{accept:/json|text/});
+
+    var saved=Taste.store.get(SAVE,''); if(saved) input.value=saved;
+    var savedQ=Taste.store.get(QSAVE,''); if(savedQ) queryEl.value=savedQ;
+    input.focus();
+  };
+</script>

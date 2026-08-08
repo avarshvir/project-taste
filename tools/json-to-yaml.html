@@ -1,0 +1,224 @@
+<!-- =========================================================================
+     Project Taste — tools/json-to-yaml.html
+     Convert JSON to YAML (and YAML back to JSON), no external library.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['json-to-yaml'] = function(root,tool,Taste){}
+
+     A compact, dependency-free YAML emitter covers the common cases:
+     objects, arrays, strings (quoted only when needed), numbers, booleans,
+     null, multi-line block scalars. A minimal YAML→JSON parser handles the
+     reverse for typical indentation-based documents.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-filetype-yml"></i></div>
+  <div class="tool-header-text">
+    <h1>JSON ↔ YAML</h1>
+    <p>Convert JSON to clean YAML and back again — no libraries, all in your browser. Great for configs, CI files and Kubernetes manifests.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="seg" role="tablist" aria-label="Direction">
+    <button class="seg-btn is-active" data-dir="j2y" role="tab"><i class="bi bi-arrow-right"></i> JSON → YAML</button>
+    <button class="seg-btn" data-dir="y2j" role="tab"><i class="bi bi-arrow-left"></i> YAML → JSON</button>
+  </div>
+
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="jy-input" id="jy-inlabel">JSON</label>
+      <textarea id="jy-input" class="textarea-taste" placeholder='{"name":"Taste","tags":["dev","utils"]}' spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="jy-output" id="jy-outlabel">YAML <span class="field-hint" id="jy-meta"></span></label>
+      <textarea id="jy-output" class="textarea-taste" placeholder="Output appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div id="jy-status" class="jx-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="convert"><i class="bi bi-arrow-left-right"></i> Convert</button>
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['json-to-yaml'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, $$ = Taste.$$, el = Taste.el;
+    var input=$('#jy-input',root), output=$('#jy-output',root), meta=$('#jy-meta',root),
+        statusEl=$('#jy-status',root), inLabel=$('#jy-inlabel',root), outLabel=$('#jy-outlabel',root);
+    var dir='j2y', SAVE='tool:json-to-yaml:input';
+
+    /* ---------- JSON → YAML ---------- */
+    function needsQuote(s){
+      if (s==='') return true;
+      if (/^[\s]|[\s]$/.test(s)) return true;                       // leading/trailing space
+      if (/^(true|false|null|yes|no|on|off|~)$/i.test(s)) return true;
+      if (/^[-+]?[0-9]/.test(s) && /^[-+]?[0-9.eE]+$/.test(s)) return true; // number-like
+      if (/[:#\[\]{}&*!|>'"%@`,]/.test(s)) return true;
+      if (/^[?\-]/.test(s)) return true;
+      return false;
+    }
+    function scalar(v){
+      if (v===null) return 'null';
+      if (typeof v==='boolean') return v?'true':'false';
+      if (typeof v==='number') return String(v);
+      var s=String(v);
+      if (s.indexOf('\n')!==-1){ return '|-\n'+s.split('\n').map(function(l){ return '  '+l; }).join('\n'); }
+      return needsQuote(s) ? JSON.stringify(s) : s;
+    }
+    function emit(v, indent){
+      var pad=new Array(indent+1).join('  ');
+      if (Array.isArray(v)){
+        if (!v.length) return pad+'[]';
+        return v.map(function(item){
+          if (item && typeof item==='object' && Object.keys(item).length){
+            var sub=emit(item, indent+1).replace(/^\s+/, ''); // first line inline after "- "
+            // put nested block under "- "
+            var block=emit(item, indent+1);
+            return pad+'- '+block.replace(new RegExp('^'+pad+'  '), '').replace(/\n/g,'\n');
+          }
+          return pad+'- '+scalar(item);
+        }).join('\n');
+      }
+      if (v && typeof v==='object'){
+        var keys=Object.keys(v);
+        if (!keys.length) return pad+'{}';
+        return keys.map(function(k){
+          var val=v[k];
+          if (val && typeof val==='object' && Object.keys(val).length){
+            return pad+k+':\n'+emit(val, indent+1);
+          }
+          if (val && typeof val==='object'){ // empty obj/array
+            return pad+k+': '+(Array.isArray(val)?'[]':'{}');
+          }
+          var sc=scalar(val);
+          if (sc.indexOf('\n')!==-1){ // block scalar
+            return pad+k+': '+sc.replace(/\n/g,'\n'+pad);
+          }
+          return pad+k+': '+sc;
+        }).join('\n');
+      }
+      return pad+scalar(v);
+    }
+    function jsonToYaml(obj){
+      if (obj===null || typeof obj!=='object') return scalar(obj);
+      return emit(obj, 0);
+    }
+
+    /* ---------- YAML → JSON (minimal, indentation-based) ---------- */
+    function parseScalar(t){
+      if (t==='' ) return null;
+      if (/^(true|yes|on)$/i.test(t)) return true;
+      if (/^(false|no|off)$/i.test(t)) return false;
+      if (/^(null|~)$/i.test(t)) return null;
+      if (/^-?\d+$/.test(t)) return parseInt(t,10);
+      if (/^-?\d*\.\d+([eE][-+]?\d+)?$/.test(t)) return parseFloat(t);
+      if ((t[0]==='"'&&t.slice(-1)==='"')||(t[0]==="'"&&t.slice(-1)==="'")){
+        try{ return JSON.parse(t.replace(/^'|'$/g,'"')); }catch(e){ return t.slice(1,-1); }
+      }
+      return t;
+    }
+    function yamlToJson(text){
+      var lines=text.replace(/\t/g,'  ').split('\n').filter(function(l){ return l.trim()!=='' && l.trim()[0]!=='#'; });
+      var root={}, stack=[{indent:-1, container:root}];
+      lines.forEach(function(line){
+        var indent=line.match(/^ */)[0].length;
+        var content=line.trim();
+        while (stack.length>1 && indent<=stack[stack.length-1].indent) stack.pop();
+        var parent=stack[stack.length-1].container;
+        if (content[0]==='-'){
+          var val=content.slice(1).trim();
+          if (!Array.isArray(parent)){ /* replace obj with array if empty */ }
+          var arr = Array.isArray(parent) ? parent : (stack[stack.length-1].array || (stack[stack.length-1].array=[]));
+          if (val.indexOf(':')!==-1){
+            var o={}; arr.push(o);
+            var kv=val.split(/:(.+)/); o[kv[0].trim()]=kv[1]?parseScalar(kv[1].trim()):null;
+            stack.push({indent:indent, container:o});
+          } else {
+            arr.push(parseScalar(val));
+          }
+          // attach the array to the last key if needed
+          stack[stack.length-1]._arr=arr;
+          if (!Array.isArray(parent) && stack[stack.length-1].lastKey!==undefined){
+            parent[stack[stack.length-1].lastKey]=arr;
+          }
+        } else {
+          var m=content.split(/:(.*)/);
+          var key=m[0].trim(); var rest=(m[1]||'').trim();
+          if (rest===''){ var child={}; parent[key]=child; stack.push({indent:indent, container:child, lastKey:key}); }
+          else { parent[key]=parseScalar(rest); }
+        }
+      });
+      return root;
+    }
+
+    function err(msg){ statusEl.hidden=false; statusEl.className='jx-status err';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-exclamation-triangle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+
+    function convert(){
+      var raw=input.value.trim();
+      if(!raw){ output.value=''; meta.textContent=''; statusEl.hidden=true; Taste.toast('Paste some input first','info'); return; }
+      try{
+        if (dir==='j2y'){
+          var obj=JSON.parse(raw);
+          output.value=jsonToYaml(obj);
+        } else {
+          var data=yamlToJson(raw);
+          output.value=JSON.stringify(data,null,2);
+        }
+        statusEl.hidden=true;
+        meta.textContent=output.value.split('\n').length+' lines';
+      }catch(e){
+        output.value=''; meta.textContent='';
+        err((dir==='j2y'?'Invalid JSON: ':'Could not parse YAML: ')+e.message);
+        Taste.toast('Conversion failed','error');
+      }
+    }
+
+    function setDir(d){
+      dir=d;
+      $$('.seg-btn',root).forEach(function(b){ b.classList.toggle('is-active', b.dataset.dir===d); });
+      inLabel.textContent  = d==='j2y'?'JSON':'YAML';
+      outLabel.firstChild.textContent = d==='j2y'?'YAML ':'JSON ';
+      input.placeholder = d==='j2y'?'{"name":"Taste","tags":["dev","utils"]}':'name: Taste\ntags:\n  - dev\n  - utils';
+      if (input.value.trim()) convert();
+    }
+
+    var actions={
+      convert:convert,
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ if(!output.value)return Taste.toast('Nothing to download','info');
+        dir==='j2y'?Taste.download('taste.yaml',output.value,'text/yaml'):Taste.download('taste.json',output.value,'application/json'); },
+      sample:function(){
+        if (dir==='j2y') input.value='{\n  "name": "Project Taste",\n  "version": "0.1.0",\n  "tags": ["dev","utils"],\n  "meta": { "open": true, "stars": null }\n}';
+        else input.value='name: Project Taste\nversion: 0.1.0\ntags:\n  - dev\n  - utils\nmeta:\n  open: true\n  stars: null';
+        convert(); save();
+      },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; statusEl.hidden=true; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    Taste.on(root,'click','.seg-btn',function(e,node){ setDir(node.dataset.dir); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); convert(); });
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); convert(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

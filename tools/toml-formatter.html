@@ -1,0 +1,203 @@
+<!-- =========================================================================
+     Project Taste — tools/toml-formatter.html
+     Format / tidy TOML and preview it as JSON.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['toml-formatter'] = function(root,tool,Taste){}
+
+     A dependency-free TOML reader/writer covering the common subset:
+       key = value            (string / int / float / bool / datetime-ish)
+       [table]  and  [a.b.c]  nested tables
+       [[array.of.tables]]    arrays of tables
+       inline arrays          key = [1, 2, 3]
+     Formatting normalises spacing, groups keys under their tables, and can
+     preview the parsed structure as JSON.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-filetype-txt"></i></div>
+  <div class="tool-header-text">
+    <h1>TOML Formatter</h1>
+    <p>Tidy and normalise TOML config files, or preview them as JSON — dependency-free, all in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="seg" role="tablist" aria-label="Output mode">
+    <button class="seg-btn is-active" data-mode="format" role="tab"><i class="bi bi-text-indent-left"></i> Format TOML</button>
+    <button class="seg-btn" data-mode="json" role="tab"><i class="bi bi-braces"></i> TOML → JSON</button>
+  </div>
+
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="tf-input">TOML <span class="field-hint">(paste or drag &amp; drop a .toml file)</span></label>
+      <textarea id="tf-input" class="textarea-taste" placeholder='title = "Taste"&#10;[owner]&#10;name = "Arshvir"' spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="tf-output">Output <span class="field-hint" id="tf-meta"></span></label>
+      <textarea id="tf-output" class="textarea-taste" placeholder="Output appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div id="tf-status" class="jx-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="run"><i class="bi bi-magic"></i> Process</button>
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .jx-status.ok  { background:var(--badge-new-bg); color:var(--badge-new-text); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['toml-formatter'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, $$ = Taste.$$, el = Taste.el;
+    var input=$('#tf-input',root), output=$('#tf-output',root), meta=$('#tf-meta',root), statusEl=$('#tf-status',root);
+    var mode='format', SAVE='tool:toml-formatter:input';
+
+    /* ---------- value parsing ---------- */
+    function parseValue(v){
+      v=v.trim();
+      if (v[0]==='"'||v[0]==="'"){ try{ return JSON.parse(v.replace(/^'|'$/g,'"')); }catch(e){ return v.slice(1,-1); } }
+      if (v==='true') return true;
+      if (v==='false') return false;
+      if (v[0]==='['){ // inline array
+        var inner=v.slice(1,-1).trim();
+        if (!inner) return [];
+        return splitTop(inner).map(parseValue);
+      }
+      if (/^[-+]?\d+$/.test(v)) return parseInt(v,10);
+      if (/^[-+]?\d*\.\d+([eE][-+]?\d+)?$/.test(v)) return parseFloat(v);
+      if (/^\d{4}-\d{2}-\d{2}/.test(v)) return v; // keep datetimes as strings
+      return v;
+    }
+    // split a comma list at top level (respecting nested [] and quotes)
+    function splitTop(s){
+      var out=[], depth=0, cur='', q=null;
+      for (var i=0;i<s.length;i++){ var c=s[i];
+        if (q){ cur+=c; if(c===q) q=null; continue; }
+        if (c==='"'||c==="'"){ q=c; cur+=c; continue; }
+        if (c==='[') depth++;
+        if (c===']') depth--;
+        if (c===',' && depth===0){ out.push(cur); cur=''; continue; }
+        cur+=c;
+      }
+      if (cur.trim()!=='') out.push(cur);
+      return out;
+    }
+
+    function setDeep(objRoot, pathArr, isArrayTable){
+      var cur=objRoot;
+      for (var i=0;i<pathArr.length;i++){
+        var k=pathArr[i], last=i===pathArr.length-1;
+        if (last && isArrayTable){
+          if (!Array.isArray(cur[k])) cur[k]=[];
+          var item={}; cur[k].push(item); return item;
+        }
+        if (cur[k]===undefined) cur[k]={};
+        if (Array.isArray(cur[k])) cur=cur[k][cur[k].length-1];
+        else cur=cur[k];
+      }
+      return cur;
+    }
+
+    function parseToml(text){
+      var lines=text.split('\n');
+      var rootObj={}, current=rootObj;
+      for (var idx=0; idx<lines.length; idx++){
+        var line=lines[idx].trim();
+        if (line===''||line[0]==='#') continue;
+        var mArr=/^\[\[(.+)\]\]$/.exec(line);
+        var mTab=/^\[(.+)\]$/.exec(line);
+        if (mArr){ current=setDeep(rootObj, mArr[1].split('.').map(function(s){return s.trim();}), true); continue; }
+        if (mTab){ current=setDeep(rootObj, mTab[1].split('.').map(function(s){return s.trim();}), false); continue; }
+        var eq=line.indexOf('=');
+        if (eq===-1){ var e=new Error('Expected "key = value" or a [table] header.'); e.line=idx+1; throw e; }
+        var key=line.slice(0,eq).trim().replace(/^["']|["']$/g,'');
+        current[key]=parseValue(line.slice(eq+1));
+      }
+      return rootObj;
+    }
+
+    /* ---------- emit tidy TOML ---------- */
+    function emitValue(v){
+      if (typeof v==='string') return /^\d{4}-\d{2}-\d{2}/.test(v)?v:JSON.stringify(v);
+      if (typeof v==='boolean') return v?'true':'false';
+      if (Array.isArray(v)) return '['+v.map(emitValue).join(', ')+']';
+      return String(v);
+    }
+    function isPlainObj(v){ return v && typeof v==='object' && !Array.isArray(v); }
+
+    function emitToml(obj, prefix, out){
+      out=out||[];
+      // scalars/arrays first
+      Object.keys(obj).forEach(function(k){
+        var v=obj[k];
+        if (isPlainObj(v)) return;
+        if (Array.isArray(v) && v.length && isPlainObj(v[0])) return; // array of tables handled later
+        out.push(k+' = '+emitValue(v));
+      });
+      // nested tables
+      Object.keys(obj).forEach(function(k){
+        var v=obj[k];
+        var path=prefix?prefix+'.'+k:k;
+        if (isPlainObj(v)){ out.push(''); out.push('['+path+']'); emitToml(v, path, out); }
+        else if (Array.isArray(v) && v.length && isPlainObj(v[0])){
+          v.forEach(function(item){ out.push(''); out.push('[['+path+']]'); emitToml(item, path, out); });
+        }
+      });
+      return out;
+    }
+
+    function ok(msg){ statusEl.hidden=false; statusEl.className='jx-status ok';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-check-circle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+    function err(msg){ statusEl.hidden=false; statusEl.className='jx-status err';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-exclamation-triangle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+
+    function run(){
+      var raw=input.value;
+      if(!raw.trim()){ output.value=''; meta.textContent=''; statusEl.hidden=true; Taste.toast('Paste some TOML first','info'); return; }
+      var obj;
+      try{ obj=parseToml(raw); }
+      catch(e){ output.value=''; meta.textContent=''; err('Invalid TOML'+(e.line?' (line '+e.line+')':'')+': '+e.message); Taste.toast('Invalid TOML','error'); return; }
+
+      if (mode==='json'){ output.value=JSON.stringify(obj,null,2); ok('Valid TOML ✓ — parsed to JSON'); }
+      else { output.value=emitToml(obj,'',[]).join('\n').replace(/^\n/,''); ok('Valid TOML — formatted'); }
+      meta.textContent=output.value.split('\n').length+' lines';
+    }
+
+    var actions={
+      run:run,
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ if(!output.value)return Taste.toast('Nothing to download','info');
+        mode==='json'?Taste.download('taste.json',output.value,'application/json'):Taste.download('taste.toml',output.value,'text/plain'); },
+      sample:function(){ input.value='title = "Project Taste"\n\n[owner]\nname = "Arshvir"\nactive = true\n\n[deps]\nlibs = ["fastapi", "torch"]\n\n[[servers]]\nhost = "a.local"\nport = 8000\n\n[[servers]]\nhost = "b.local"\nport = 9000'; run(); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; statusEl.hidden=true; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    Taste.on(root,'click','.seg-btn',function(e,node){
+      mode=node.dataset.mode;
+      $$('.seg-btn',root).forEach(function(b){ b.classList.toggle('is-active', b===node); });
+      if(input.value.trim()) run();
+    });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); run(); });
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); run(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

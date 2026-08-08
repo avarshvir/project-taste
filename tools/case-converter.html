@@ -1,0 +1,155 @@
+<!-- =========================================================================
+     Project Taste — tools/case-converter.html
+     Convert text between UPPER, lower, Title, Sentence, camelCase,
+     PascalCase, snake_case, CONSTANT_CASE, kebab-case and dot.case.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['case-converter'] = function (root, tool, Taste){...}
+
+     Design note: a single generic tokenizer turns ANY input into a list of
+     lowercase "words" by splitting on whitespace, punctuation AND camelCase
+     boundaries. Every case format is then built from that word list — so it
+     works for arbitrary input with no per-format hacks.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-type"></i></div>
+  <div class="tool-header-text">
+    <h1>Case Converter</h1>
+    <p>Instantly convert text to any case — camelCase, snake_case, Title Case and more. Copy any result with one click.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="cc-input">Input
+      <span class="field-hint">(type or paste — updates live)</span>
+    </label>
+    <textarea id="cc-input" class="textarea-taste" style="min-height:120px"
+      placeholder="Type some text… e.g. “Project Taste is delicious”" spellcheck="false"></textarea>
+  </div>
+
+  <div class="stat-row" id="cc-stats"></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <label class="field-label" style="margin-top:var(--sp-4)">Conversions</label>
+  <ul class="result-list" id="cc-results"></ul>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['case-converter'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+
+    var input   = $('#cc-input', root);
+    var results = $('#cc-results', root);
+    var statRow = $('#cc-stats', root);
+    var SAVE_KEY = 'tool:case-converter:input';
+
+    /* ---- Generic tokenizer: any string -> array of lowercase words ---- */
+    function tokenize(str) {
+      if (!str) return [];
+      return str
+        // insert a space at camelCase / PascalCase boundaries
+        .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+        .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+        // any run of non-alphanumeric becomes a separator
+        .split(/[^a-zA-Z0-9]+/)
+        .filter(Boolean)
+        .map(function (w) { return w.toLowerCase(); });
+    }
+
+    function cap(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
+
+    /* ---- Case builders (all derived from the word list) ---- */
+    var FORMATS = [
+      { key: 'UPPERCASE',      icon: 'bi-arrow-up-circle',
+        fn: function (s) { return s.toUpperCase(); }, raw: true },
+      { key: 'lowercase',      icon: 'bi-arrow-down-circle',
+        fn: function (s) { return s.toLowerCase(); }, raw: true },
+      { key: 'Title Case',     icon: 'bi-type-h1',
+        fn: function (w) { return w.map(cap).join(' '); } },
+      { key: 'Sentence case',  icon: 'bi-fonts',
+        fn: function (w) { return w.length ? cap(w.join(' ')) : ''; } },
+      { key: 'camelCase',      icon: 'bi-code',
+        fn: function (w) { return w.map(function (x,i){ return i? cap(x):x; }).join(''); } },
+      { key: 'PascalCase',     icon: 'bi-code-square',
+        fn: function (w) { return w.map(cap).join(''); } },
+      { key: 'snake_case',     icon: 'bi-dash',
+        fn: function (w) { return w.join('_'); } },
+      { key: 'CONSTANT_CASE',  icon: 'bi-braces',
+        fn: function (w) { return w.join('_').toUpperCase(); } },
+      { key: 'kebab-case',     icon: 'bi-dash-lg',
+        fn: function (w) { return w.join('-'); } },
+      { key: 'dot.case',       icon: 'bi-three-dots',
+        fn: function (w) { return w.join('.'); } }
+    ];
+
+    /* ---- Render ---- */
+    function render() {
+      var raw = input.value;
+      var words = tokenize(raw);
+
+      // Stats
+      statRow.innerHTML = '';
+      var chars = raw.length;
+      var wc = words.length;
+      [['bi-fonts', wc + ' word' + (wc===1?'':'s')],
+       ['bi-123', chars + ' char' + (chars===1?'':'s')],
+       ['bi-hdd', Taste.bytes(new Blob([raw]).size)]
+      ].forEach(function (s) {
+        statRow.appendChild(el('span', { class: 'stat-chip' }, [
+          el('i', { class: 'bi ' + s[0] }),
+          el('strong', { text: String(s[1]).split(' ')[0] }),
+          document.createTextNode(' ' + s[1].split(' ').slice(1).join(' '))
+        ]));
+      });
+
+      // Results
+      results.innerHTML = '';
+      FORMATS.forEach(function (f) {
+        var val = f.raw ? f.fn(raw) : f.fn(words);
+        results.appendChild(
+          el('li', {}, [
+            el('i', { class: 'bi ' + f.icon, style: 'color:var(--accent)', title: f.key }),
+            el('span', { text: val || '—' }),
+            el('button', {
+              class: 'copy-inline', type: 'button', title: 'Copy ' + f.key,
+              'aria-label': 'Copy ' + f.key,
+              onclick: function () { if (val) Taste.copy(val); }
+            }, [ el('i', { class: 'bi bi-clipboard' }) ])
+          ])
+        );
+      });
+    }
+
+    /* ---- Actions ---- */
+    Taste.on(root, 'click', '[data-act]', function (e, node) {
+      if (node.dataset.act === 'sample') {
+        input.value = 'Project Taste is delicious';
+        render(); save();
+      } else if (node.dataset.act === 'clear') {
+        input.value = ''; render(); Taste.store.remove(SAVE_KEY);
+      }
+    });
+
+    /* ---- Live update + autosave ---- */
+    var save = Taste.debounce(function () { Taste.store.set(SAVE_KEY, input.value); }, 400);
+    Taste.on(input, 'input', function () { render(); save(); });
+
+    // Drag & drop a text file
+    Taste.dropzone(input, function (text) { input.value = text; render(); save(); Taste.toast('File loaded', 'success'); });
+
+    // Restore
+    var saved = Taste.store.get(SAVE_KEY, '');
+    if (saved) input.value = saved;
+
+    render();
+    input.focus();
+  };
+</script>

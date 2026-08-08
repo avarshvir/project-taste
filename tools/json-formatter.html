@@ -1,0 +1,226 @@
+<!-- =========================================================================
+     Project Taste — tools/json-formatter.html
+     JSON Formatter · Validator · Minifier.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['json-formatter'] = function (root, tool, Taste){...}
+
+     Validation uses native JSON.parse; on failure we translate the error's
+     character offset into a human line:column so the user can jump to the
+     problem. Formatting is generic (works on any valid JSON), with optional
+     key sorting applied recursively.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-braces-asterisk"></i></div>
+  <div class="tool-header-text">
+    <h1>JSON Formatter</h1>
+    <p>Pretty-print, validate and minify JSON — with precise error locations. Everything runs locally in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="jf-input">Input <span class="field-hint">(paste JSON — drag &amp; drop a .json file)</span></label>
+      <textarea id="jf-input" class="textarea-taste" placeholder='{"hello":"world","items":[1,2,3]}' spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="jf-output">Output <span class="field-hint" id="jf-meta"></span></label>
+      <textarea id="jf-output" class="textarea-taste" placeholder="Formatted JSON appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <!-- validity banner -->
+  <div id="jf-status" class="jf-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="format"><i class="bi bi-magic"></i> Format</button>
+    <button class="btn-taste btn-taste-primary" data-act="minify"><i class="bi bi-arrows-collapse"></i> Minify</button>
+    <button class="btn-taste btn-taste-secondary" data-act="validate"><i class="bi bi-check2-circle"></i> Validate</button>
+
+    <label class="field-label" for="jf-indent" style="margin:0 var(--sp-1) 0 var(--sp-2)">Indent</label>
+    <select id="jf-indent" class="select-taste" style="width:auto">
+      <option value="2">2 spaces</option>
+      <option value="4">4 spaces</option>
+      <option value="\t">Tab</option>
+    </select>
+    <label class="check-inline"><input type="checkbox" id="jf-sort"> Sort keys</label>
+  </div>
+
+  <div class="stat-row" id="jf-stats"></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download .json</button>
+    <button class="btn-taste btn-taste-ghost" data-act="swap"><i class="bi bi-arrow-down-up"></i> Swap</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-lightbulb"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<style>
+  .jf-status {
+    display: flex; align-items: center; gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-4);
+    border-radius: var(--radius-md); font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  }
+  .jf-status.ok  { background: var(--badge-new-bg); color: var(--badge-new-text); }
+  .jf-status.err { background: rgba(220,38,38,0.12); color: var(--danger); }
+  .jf-status .bi { font-size: var(--fs-md); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['json-formatter'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+
+    var input  = $('#jf-input', root);
+    var output = $('#jf-output', root);
+    var meta   = $('#jf-meta', root);
+    var statusEl = $('#jf-status', root);
+    var stats  = $('#jf-stats', root);
+    var indentSel = $('#jf-indent', root);
+    var sortChk = $('#jf-sort', root);
+    var SAVE_KEY = 'tool:json-formatter:input';
+
+    function indentValue() {
+      var v = indentSel.value;
+      return v === '\\t' ? '\t' : parseInt(v, 10);
+    }
+
+    /* ---- recursively sort object keys (arrays keep order) ---- */
+    function sortKeys(value) {
+      if (Array.isArray(value)) return value.map(sortKeys);
+      if (value && typeof value === 'object') {
+        return Object.keys(value).sort().reduce(function (acc, k) {
+          acc[k] = sortKeys(value[k]); return acc;
+        }, {});
+      }
+      return value;
+    }
+
+    /* ---- translate a JSON.parse error into line:col ---- */
+    function locate(text, err) {
+      var m = /position (\d+)/.exec(err.message);
+      if (!m) return null;
+      var pos = parseInt(m[1], 10);
+      var upto = text.slice(0, pos);
+      var line = upto.split('\n').length;
+      var col = pos - upto.lastIndexOf('\n');
+      return { line: line, col: col, pos: pos };
+    }
+
+    function showStatus(ok, msg) {
+      statusEl.hidden = false;
+      statusEl.className = 'jf-status ' + (ok ? 'ok' : 'err');
+      statusEl.innerHTML = '';
+      statusEl.appendChild(el('i', { class: 'bi ' + (ok ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill') }));
+      statusEl.appendChild(el('span', { text: msg }));
+    }
+
+    function setOutput(text) {
+      output.value = text;
+      meta.textContent = text ? (text.length + ' chars · ' + Taste.bytes(new Blob([text]).size)) : '';
+    }
+
+    /* ---- depth calculator for stats ---- */
+    function depthOf(v) {
+      if (Array.isArray(v)) return 1 + v.reduce(function (m, x){ return Math.max(m, depthOf(x)); }, 0);
+      if (v && typeof v === 'object') return 1 + Object.keys(v).reduce(function (m, k){ return Math.max(m, depthOf(v[k])); }, 0);
+      return 0;
+    }
+    function countKeys(v) {
+      if (Array.isArray(v)) return v.reduce(function (s, x){ return s + countKeys(x); }, 0);
+      if (v && typeof v === 'object') return Object.keys(v).reduce(function (s, k){ return s + 1 + countKeys(v[k]); }, 0);
+      return 0;
+    }
+
+    function renderStats(obj, before, after) {
+      stats.innerHTML = '';
+      var items = [
+        ['bi-key', countKeys(obj) + ' keys'],
+        ['bi-diagram-3', depthOf(obj) + ' depth'],
+        ['bi-hdd', Taste.bytes(before) + ' → ' + Taste.bytes(after)]
+      ];
+      items.forEach(function (s) {
+        stats.appendChild(el('span', { class: 'stat-chip' }, [
+          el('i', { class: 'bi ' + s[0] }),
+          el('strong', { text: String(s[1]).split(' ')[0] }),
+          document.createTextNode(' ' + s[1].split(' ').slice(1).join(' '))
+        ]));
+      });
+    }
+
+    /* ---- core: parse then act ---- */
+    function process(mode) {
+      var raw = input.value.trim();
+      if (!raw) { setOutput(''); statusEl.hidden = true; stats.innerHTML=''; Taste.toast('Paste some JSON first', 'info'); return; }
+      var obj;
+      try {
+        obj = JSON.parse(raw);
+      } catch (err) {
+        var loc = locate(raw, err);
+        setOutput('');
+        showStatus(false, 'Invalid JSON: ' + err.message +
+          (loc ? '  (line ' + loc.line + ', column ' + loc.col + ')' : ''));
+        stats.innerHTML = '';
+        Taste.toast('Invalid JSON', 'error');
+        return;
+      }
+
+      if (sortChk.checked) obj = sortKeys(obj);
+
+      var result;
+      if (mode === 'minify') result = JSON.stringify(obj);
+      else if (mode === 'validate') result = JSON.stringify(obj, null, indentValue());
+      else result = JSON.stringify(obj, null, indentValue());
+
+      setOutput(result);
+      showStatus(true, mode === 'minify' ? 'Valid JSON — minified' :
+                       mode === 'validate' ? 'Valid JSON ✓' : 'Valid JSON — formatted');
+      renderStats(obj, new Blob([raw]).size, new Blob([result]).size);
+    }
+
+    /* ---- actions ---- */
+    var actions = {
+      format:   function () { process('format'); },
+      minify:   function () { process('minify'); },
+      validate: function () { process('validate'); },
+      copy:     function () { Taste.copy(output.value); },
+      download: function () { output.value ? Taste.download('taste-formatted.json', output.value, 'application/json')
+                                           : Taste.toast('Nothing to download', 'info'); },
+      swap:     function () { if (!output.value) return Taste.toast('No output to swap', 'info');
+                              input.value = output.value; save(); },
+      sample:   function () {
+        input.value = '{"name":"Project Taste","version":"0.1.0","tools":127,"tags":["dev","utils"],"meta":{"open_source":true,"stars":null}}';
+        process('format'); save();
+      },
+      clear:    function () { input.value=''; setOutput(''); statusEl.hidden=true; stats.innerHTML='';
+                              Taste.store.remove(SAVE_KEY); }
+    };
+    Taste.on(root, 'click', '[data-act]', function (e, node) {
+      var fn = actions[node.dataset.act]; if (fn) fn();
+    });
+
+    // Re-run formatting live when indent / sort change (only if output exists)
+    Taste.on(indentSel, 'change', function () { if (output.value) process('format'); });
+    Taste.on(sortChk, 'change', function () { if (output.value) process('format'); });
+
+    /* ---- autosave + restore + dnd ---- */
+    var save = Taste.debounce(function () { Taste.store.set(SAVE_KEY, input.value); }, 400);
+    Taste.on(input, 'input', save);
+    Taste.dropzone(input, function (t) { input.value = t; save(); process('format'); }, { accept: /json|text/ });
+
+    var saved = Taste.store.get(SAVE_KEY, '');
+    if (saved) { input.value = saved; }
+
+    // Ctrl/⌘ + Enter formats
+    Taste.on(input, 'keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); process('format'); }
+    });
+
+    input.focus();
+  };
+</script>

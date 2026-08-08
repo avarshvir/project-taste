@@ -1,0 +1,168 @@
+<!-- =========================================================================
+     Project Taste — tools/random-text-generator.html
+     Generate random placeholder text: Lorem Ipsum, words, sentences,
+     paragraphs, random characters, or gibberish.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['random-text-generator'] = function(root,tool,Taste){}
+
+     Assembly is generic: sentences/paragraphs are built from a word bank
+     with randomized lengths, so every run differs. Randomness uses the
+     CSPRNG when available.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-shuffle"></i></div>
+  <div class="tool-header-text">
+    <h1>Random Text Generator</h1>
+    <p>Generate Lorem Ipsum and other placeholder text — words, sentences, paragraphs, random characters or gibberish. Great for mockups and testing.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="toolbar">
+    <label class="field-label" style="margin:0 var(--sp-2) 0 0">Type</label>
+    <select id="rt-type" class="select-taste" style="width:auto">
+      <option value="paragraphs">Paragraphs</option>
+      <option value="sentences">Sentences</option>
+      <option value="words">Words</option>
+      <option value="chars">Random characters</option>
+      <option value="gibberish">Gibberish words</option>
+    </select>
+
+    <label class="field-label" for="rt-count" style="margin:0 var(--sp-1) 0 var(--sp-2)">Amount</label>
+    <input type="number" id="rt-count" class="input-taste" style="width:90px" min="1" max="500" value="3">
+
+    <label class="check-inline" id="rt-lorem-wrap"><input type="checkbox" id="rt-lorem" checked> Start with “Lorem ipsum…”</label>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="generate"><i class="bi bi-arrow-repeat"></i> Generate</button>
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div class="stat-row" id="rt-stats"></div>
+
+  <div class="field">
+    <label class="field-label" for="rt-output">Output</label>
+    <textarea id="rt-output" class="textarea-taste" style="min-height:240px" placeholder="Generated text appears here…" spellcheck="false"></textarea>
+  </div>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['random-text-generator'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var typeSel=$('#rt-type',root), countEl=$('#rt-count',root), loremChk=$('#rt-lorem',root),
+        loremWrap=$('#rt-lorem-wrap',root), output=$('#rt-output',root), stats=$('#rt-stats',root);
+
+    // Classic lorem word bank
+    var BANK=('lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor '+
+      'incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud '+
+      'exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure '+
+      'in reprehenderit voluptate velit esse cillum eu fugiat nulla pariatur excepteur sint '+
+      'occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum').split(' ');
+    var GIB='bcdfghjklmnpqrstvwxyz', VOW='aeiou';
+    var LOREM_START=['lorem','ipsum','dolor','sit','amet'];
+
+    /* ---- CSPRNG-backed helpers ---- */
+    function rnd(max){
+      if (window.crypto && crypto.getRandomValues){
+        var b=new Uint32Array(1); crypto.getRandomValues(b); return b[0]%max;
+      }
+      return Math.floor(Math.random()*max);
+    }
+    function pick(arr){ return arr[rnd(arr.length)]; }
+    function between(a,b){ return a + rnd(b-a+1); }
+    function cap(w){ return w.charAt(0).toUpperCase()+w.slice(1); }
+
+    function gibWord(){
+      var len=between(3,9), w='';
+      for (var i=0;i<len;i++){ w += (i%2===0)?GIB[rnd(GIB.length)]:VOW[rnd(VOW.length)]; }
+      return w;
+    }
+
+    function makeSentence(i, forceLoremStart){
+      var n=between(6,14), words=[];
+      for (var w=0; w<n; w++){
+        if (forceLoremStart && w<LOREM_START.length) words.push(LOREM_START[w]);
+        else words.push(pick(BANK));
+      }
+      // occasional commas
+      if (n>8) words[between(2,n-3)] += ',';
+      var s=words.join(' ');
+      return cap(s)+'.';
+    }
+
+    function makeParagraph(i, forceLoremStart){
+      var n=between(3,6), out=[];
+      for (var s=0;s<n;s++) out.push(makeSentence(s, forceLoremStart && i===0 && s===0));
+      return out.join(' ');
+    }
+
+    function generate(){
+      var type=typeSel.value;
+      var n=Math.max(1, Math.min(500, parseInt(countEl.value,10)||1));
+      countEl.value=n;
+      var result='';
+
+      if (type==='paragraphs'){
+        var paras=[];
+        for (var p=0;p<n;p++) paras.push(makeParagraph(p, loremChk.checked));
+        result=paras.join('\n\n');
+      } else if (type==='sentences'){
+        var sents=[];
+        for (var s=0;s<n;s++) sents.push(makeSentence(s, loremChk.checked && s===0));
+        result=sents.join(' ');
+      } else if (type==='words'){
+        var words=[];
+        for (var w=0;w<n;w++){
+          words.push((loremChk.checked && w<LOREM_START.length)?LOREM_START[w]:pick(BANK));
+        }
+        result=cap(words.join(' '));
+      } else if (type==='gibberish'){
+        var g=[]; for (var i=0;i<n;i++) g.push(gibWord()); result=g.join(' ');
+      } else { // chars
+        var chars=GIB+VOW+'0123456789';
+        var buf=''; for (var c=0;c<n;c++) buf+=chars[rnd(chars.length)];
+        result=buf;
+      }
+
+      output.value=result;
+      renderStats(result);
+    }
+
+    function renderStats(text){
+      stats.innerHTML='';
+      var words=(text.match(/[^\s]+/g)||[]).length;
+      var chars=text.length;
+      [['bi-fonts', words+' words'],['bi-123', chars+' chars'],['bi-hdd', Taste.bytes(new Blob([text]).size)]]
+      .forEach(function(sp){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+sp[0]}), el('strong',{text:String(sp[1]).split(' ')[0]}),
+        document.createTextNode(' '+sp[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    function syncLoremVisibility(){
+      // "Start with Lorem ipsum" only makes sense for word-based types
+      var t=typeSel.value;
+      loremWrap.style.display=(t==='chars'||t==='gibberish')?'none':'';
+    }
+
+    var actions={
+      generate:generate,
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste-lorem.txt',output.value):Taste.toast('Generate first','info'); },
+      clear:function(){ output.value=''; stats.innerHTML=''; }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    Taste.on(typeSel,'change',function(){ syncLoremVisibility(); generate(); });
+    [countEl,loremChk].forEach(function(c){ Taste.on(c,'change',generate); });
+    Taste.on(countEl,'keydown',function(e){ if(e.key==='Enter')generate(); });
+
+    syncLoremVisibility();
+    generate();
+  };
+</script>

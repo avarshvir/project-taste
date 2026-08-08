@@ -1,0 +1,162 @@
+<!-- =========================================================================
+     Project Taste — tools/sql-to-json.html
+     Convert SQL INSERT statements into JSON objects.
+     TasteTools: window.TasteTools['sql-to-json'] = fn(root,tool,Taste)
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-database-fill-up"></i></div>
+  <div class="tool-header-text">
+    <h1>SQL to JSON</h1>
+    <p>Turn SQL <code>INSERT</code> statements into a clean JSON array of objects — values are typed automatically. Runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="sj-input">SQL <span class="field-hint">(INSERT statements; CREATE TABLE optional for column names)</span></label>
+      <textarea id="sj-input" class="textarea-taste" placeholder="INSERT INTO users (id,name) VALUES (1,'Ann'),(2,'Bo');" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="sj-output">JSON <span class="field-hint" id="sj-meta"></span></label>
+      <textarea id="sj-output" class="textarea-taste" placeholder="JSON array appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div id="sj-status" class="jx-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="convert"><i class="bi bi-arrow-right"></i> Convert</button>
+    <label class="check-inline"><input type="checkbox" id="sj-group"> Group by table</label>
+    <label class="check-inline"><input type="checkbox" id="sj-pretty" checked> Pretty print</label>
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download .json</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div class="stat-row" id="sj-stats"></div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .jx-status.ok  { background:var(--badge-new-bg); color:var(--badge-new-text); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['sql-to-json'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#sj-input',root), output=$('#sj-output',root), meta=$('#sj-meta',root),
+        statusEl=$('#sj-status',root), stats=$('#sj-stats',root),
+        groupChk=$('#sj-group',root), prettyChk=$('#sj-pretty',root);
+    var SAVE='tool:sql-to-json:input';
+
+    function typeValue(tok){
+      tok=tok.trim();
+      if (tok==='') return null;
+      if (/^null$/i.test(tok)) return null;
+      if (/^true$/i.test(tok)) return true;
+      if (/^false$/i.test(tok)) return false;
+      if ((tok[0]==="'"&&tok.slice(-1)==="'")||(tok[0]==='"'&&tok.slice(-1)==='"'))
+        return tok.slice(1,-1).replace(/''/g,"'").replace(/\\'/g,"'");
+      if (/^-?\d+$/.test(tok)) return parseInt(tok,10);
+      if (/^-?\d*\.\d+([eE][-+]?\d+)?$/.test(tok)) return parseFloat(tok);
+      return tok;
+    }
+    function splitTuple(s){
+      var out=[], cur='', q=null;
+      for (var i=0;i<s.length;i++){ var c=s[i];
+        if (q){ cur+=c; if(c===q){ if(s[i+1]===q){ cur+=q; i++; } else q=null; } continue; }
+        if (c==="'"||c==='"'){ q=c; cur+=c; continue; }
+        if (c===','){ out.push(cur); cur=''; continue; }
+        cur+=c;
+      }
+      out.push(cur);
+      return out.map(function(x){ return x.trim(); });
+    }
+    function readParen(str, start){
+      var depth=0, q=null;
+      for (var i=start;i<str.length;i++){ var c=str[i];
+        if (q){ if(c===q&&str[i-1]!=='\\') q=null; continue; }
+        if (c==="'"||c==='"'){ q=c; continue; }
+        if (c==='('){ depth++; if(depth===1) start=i; }
+        if (c===')'){ depth--; if(depth===0) return [str.slice(start+1,i), i]; }
+      }
+      return null;
+    }
+
+    function convert(){
+      var sql=input.value; stats.innerHTML=''; statusEl.hidden=true;
+      if(!sql.trim()){ output.value=''; meta.textContent=''; Taste.toast('Paste some SQL first','info'); return; }
+
+      var createCols={};
+      sql.replace(/create\s+table\s+`?(\w+)`?\s*\(([\s\S]*?)\)\s*;/gi, function(_, tbl, body){
+        var cols=[];
+        splitTuple(body).forEach(function(def){
+          var m=/^`?(\w+)`?/.exec(def.trim()); if(m && !/^(primary|foreign|constraint|unique|key|index|check)$/i.test(m[1])) cols.push(m[1]);
+        });
+        createCols[tbl.toLowerCase()]=cols; return _;
+      });
+
+      var byTable={}, all=[], total=0, re=/insert\s+into\s+`?(\w+)`?\s*(\([^)]*\))?\s*values/gi, m;
+      while ((m=re.exec(sql))!==null){
+        var table=m[1];
+        var cols=null;
+        if (m[2]) cols=splitTuple(m[2].slice(1,-1)).map(function(c){ return c.replace(/[`'"]/g,''); });
+        else cols=createCols[table.toLowerCase()]||null;
+        var idx=re.lastIndex, rows=[];
+        while (true){
+          while (idx<sql.length && /[\s,]/.test(sql[idx])) idx++;
+          if (sql[idx]!=='(') break;
+          var res=readParen(sql, idx);
+          if (!res) break;
+          var vals=splitTuple(res[0]).map(typeValue), obj={};
+          vals.forEach(function(v,i){ var key=cols&&cols[i]?cols[i]:('col'+(i+1)); obj[key]=v; });
+          rows.push(obj); total++;
+          idx=res[1]+1;
+        }
+        (byTable[table]=byTable[table]||[]).push.apply(byTable[table], rows);
+        all.push.apply(all, rows);
+        re.lastIndex=idx;
+      }
+
+      if (!total){ statusEl.hidden=false; statusEl.className='jx-status err';
+        statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-exclamation-triangle-fill'}));
+        statusEl.appendChild(el('span',{text:'No INSERT statements found.'})); output.value=''; return; }
+
+      var data = groupChk.checked ? byTable : all;
+      output.value = prettyChk.checked ? JSON.stringify(data,null,2) : JSON.stringify(data);
+      meta.textContent = total+' rows';
+      statusEl.hidden=false; statusEl.className='jx-status ok';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-check-circle-fill'}));
+      statusEl.appendChild(el('span',{text:'Parsed '+total+' row'+(total===1?'':'s')+' from '+Object.keys(byTable).length+' table(s).'}));
+      [['bi-table', total+' rows'],['bi-diagram-3', Object.keys(byTable).length+' tables'],
+       ['bi-hdd', Taste.bytes(new Blob([output.value]).size)]]
+      .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    var actions={
+      convert:convert,
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste-sql.json',output.value,'application/json'):Taste.toast('Nothing to download','info'); },
+      sample:function(){ input.value="CREATE TABLE users (id INT, name VARCHAR(50), active BOOLEAN);\nINSERT INTO users (id,name,active) VALUES (1,'Ann',true),(2,'Bo',false);\nINSERT INTO orders VALUES (10, 1, 99.5, NULL);"; convert(); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; statusEl.hidden=true; stats.innerHTML=''; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    [groupChk,prettyChk].forEach(function(c){ Taste.on(c,'change',function(){ if(output.value)convert(); }); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); convert(); },{accept:/sql|text/});
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); convert(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

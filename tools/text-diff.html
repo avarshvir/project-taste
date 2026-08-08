@@ -1,0 +1,219 @@
+<!-- =========================================================================
+     Project Taste — tools/text-diff.html
+     Line-level text diff with LCS highlighting.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['text-diff'] = function (root, tool, Taste){...}
+
+     Algorithm: classic Longest Common Subsequence (LCS) over lines, then a
+     backtrack that emits a sequence of {type: 'same'|'add'|'del', text}.
+     Generic — works on code, prose, JSON, anything. No per-input hacks.
+     Optional normalizers (ignore case / trim whitespace) affect ONLY the
+     comparison keys, never the displayed text.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-file-diff"></i></div>
+  <div class="tool-header-text">
+    <h1>Text Diff</h1>
+    <p>Compare two texts and see exactly what changed — added, removed and unchanged lines. Runs entirely in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="td-left">Original <span class="field-hint">(A)</span></label>
+      <textarea id="td-left" class="textarea-taste" placeholder="Paste the original text…" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="td-right">Changed <span class="field-hint">(B)</span></label>
+      <textarea id="td-right" class="textarea-taste" placeholder="Paste the changed text…" spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="compare"><i class="bi bi-file-diff"></i> Compare</button>
+    <label class="check-inline"><input type="checkbox" id="td-case"> Ignore case</label>
+    <label class="check-inline"><input type="checkbox" id="td-ws"> Ignore whitespace</label>
+    <button class="btn-taste btn-taste-secondary" data-act="swap"><i class="bi bi-arrow-left-right"></i> Swap A/B</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div class="stat-row" id="td-stats"></div>
+
+  <label class="field-label">Diff</label>
+  <div class="diff-output" id="td-out">
+    <p class="no-results" style="text-align:center">Paste text into both panes and hit Compare.</p>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-secondary" data-act="copydiff"><i class="bi bi-clipboard-check"></i> Copy Diff</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download .diff</button>
+  </div>
+</div>
+
+<style>
+  /* Tool-local styles — scoped by the .diff-output container so they never
+     leak into other tools. Uses theme tokens for full light/dark support. */
+  .diff-output {
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+    line-height: 1.5;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: auto;
+    max-height: 460px;
+  }
+  .diff-line { display: flex; white-space: pre-wrap; word-break: break-word; padding: 0 var(--sp-3); }
+  .diff-line .gutter {
+    flex: 0 0 1.6em; text-align: center; user-select: none;
+    color: var(--text-subtle); opacity: 0.8; margin-right: var(--sp-2);
+  }
+  .diff-line .ln {
+    flex: 0 0 3.2em; text-align: right; user-select: none;
+    color: var(--text-subtle); opacity: 0.6; margin-right: var(--sp-3);
+  }
+  .diff-line .txt { flex: 1 1 auto; }
+  .diff-line.add { background: rgba(5, 150, 105, 0.14); }
+  .diff-line.add .gutter { color: var(--success); }
+  .diff-line.del { background: rgba(220, 38, 38, 0.13); }
+  .diff-line.del .gutter { color: var(--danger); }
+  .diff-line.same { color: var(--text-muted); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['text-diff'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+
+    var left  = $('#td-left', root);
+    var right = $('#td-right', root);
+    var out   = $('#td-out', root);
+    var stats = $('#td-stats', root);
+    var igCase= $('#td-case', root);
+    var igWs  = $('#td-ws', root);
+    var LS='tool:text-diff:left', RS='tool:text-diff:right';
+
+    /* ---- normalize a line into a comparison key (display text unaffected) ---- */
+    function key(line) {
+      var k = line;
+      if (igWs.checked) k = k.replace(/\s+/g, ' ').trim();
+      if (igCase.checked) k = k.toLowerCase();
+      return k;
+    }
+
+    /* ---- LCS diff over arrays of lines ---- */
+    function diff(aLines, bLines) {
+      var a = aLines.map(key), b = bLines.map(key);
+      var n = a.length, m = b.length;
+      // DP table of LCS lengths
+      var dp = [];
+      for (var i = 0; i <= n; i++) dp.push(new Array(m + 1).fill(0));
+      for (i = n - 1; i >= 0; i--)
+        for (var j = m - 1; j >= 0; j--)
+          dp[i][j] = a[i] === b[j] ? dp[i+1][j+1] + 1 : Math.max(dp[i+1][j], dp[i][j+1]);
+
+      // Backtrack into an ordered op list
+      var ops = [], i2 = 0, j2 = 0;
+      while (i2 < n && j2 < m) {
+        if (a[i2] === b[j2]) { ops.push({ t:'same', text:aLines[i2] }); i2++; j2++; }
+        else if (dp[i2+1][j2] >= dp[i2][j2+1]) { ops.push({ t:'del', text:aLines[i2] }); i2++; }
+        else { ops.push({ t:'add', text:bLines[j2] }); j2++; }
+      }
+      while (i2 < n) { ops.push({ t:'del', text:aLines[i2++] }); }
+      while (j2 < m) { ops.push({ t:'add', text:bLines[j2++] }); }
+      return ops;
+    }
+
+    function render(ops) {
+      out.innerHTML = '';
+      var adds = 0, dels = 0, la = 0, lb = 0;
+      ops.forEach(function (op) {
+        var sign = op.t === 'add' ? '+' : op.t === 'del' ? '−' : ' ';
+        if (op.t === 'add') { adds++; lb++; }
+        else if (op.t === 'del') { dels++; la++; }
+        else { la++; lb++; }
+        var lnNo = op.t === 'add' ? lb : la;
+        out.appendChild(el('div', { class: 'diff-line ' + op.t }, [
+          el('span', { class: 'gutter', text: sign }),
+          el('span', { class: 'ln', text: String(lnNo) }),
+          el('span', { class: 'txt', text: op.text })
+        ]));
+      });
+
+      // Stats
+      stats.innerHTML = '';
+      [['bi-plus-circle', adds + ' added', 'var(--success)'],
+       ['bi-dash-circle', dels + ' removed', 'var(--danger)'],
+       ['bi-check2', (ops.length - adds - dels) + ' unchanged', 'var(--accent)']
+      ].forEach(function (s) {
+        stats.appendChild(el('span', { class: 'stat-chip' }, [
+          el('i', { class: 'bi ' + s[0], style: 'color:' + s[2] }),
+          el('strong', { text: String(s[1]).split(' ')[0] }),
+          document.createTextNode(' ' + s[1].split(' ').slice(1).join(' '))
+        ]));
+      });
+
+      if (!ops.length) out.innerHTML = '<p class="no-results" style="text-align:center">Both inputs are empty.</p>';
+    }
+
+    var lastOps = [];
+    function compare() {
+      var a = left.value.split('\n');
+      var b = right.value.split('\n');
+      // treat two empty textareas as empty
+      if (!left.value && !right.value) { render([]); lastOps = []; return; }
+      lastOps = diff(a, b);
+      render(lastOps);
+    }
+
+    function opsToText() {
+      return lastOps.map(function (o) {
+        return (o.t === 'add' ? '+ ' : o.t === 'del' ? '- ' : '  ') + o.text;
+      }).join('\n');
+    }
+
+    /* ---- actions ---- */
+    var actions = {
+      compare: compare,
+      swap:    function () { var t = left.value; left.value = right.value; right.value = t; save(); compare(); },
+      sample:  function () {
+        left.value  = 'function greet(name) {\n  console.log("Hi " + name);\n}\ngreet("Taste");';
+        right.value = 'function greet(name) {\n  console.log(`Hello, ${name}!`);\n}\ngreet("Taste");\n// done';
+        save(); compare();
+      },
+      clear:   function () { left.value=''; right.value=''; render([]); lastOps=[];
+                             Taste.store.remove(LS); Taste.store.remove(RS); },
+      copydiff:function () { lastOps.length ? Taste.copy(opsToText()) : Taste.toast('Nothing to copy', 'info'); },
+      download:function () { lastOps.length ? Taste.download('taste.diff', opsToText())
+                                            : Taste.toast('Nothing to download', 'info'); }
+    };
+    Taste.on(root, 'click', '[data-act]', function (e, node) {
+      var fn = actions[node.dataset.act]; if (fn) fn();
+    });
+
+    // Re-compare when options change
+    Taste.on(igCase, 'change', compare);
+    Taste.on(igWs, 'change', compare);
+
+    /* ---- autosave + restore ---- */
+    var save = Taste.debounce(function () {
+      Taste.store.set(LS, left.value); Taste.store.set(RS, right.value);
+    }, 400);
+    Taste.on(left, 'input', save);
+    Taste.on(right, 'input', save);
+    Taste.dropzone(left,  function (t) { left.value = t;  save(); compare(); });
+    Taste.dropzone(right, function (t) { right.value = t; save(); compare(); });
+
+    var sl = Taste.store.get(LS, ''), sr = Taste.store.get(RS, '');
+    if (sl) left.value = sl;
+    if (sr) right.value = sr;
+    if (sl || sr) compare();
+
+    left.focus();
+  };
+</script>

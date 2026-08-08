@@ -1,0 +1,98 @@
+<!-- =========================================================================
+     Project Taste — tools/json-minify.html
+     Minify JSON to the smallest valid payload, with size savings.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['json-minify'] = function(root,tool,Taste){}
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-arrows-collapse"></i></div>
+  <div class="tool-header-text">
+    <h1>JSON Minify</h1>
+    <p>Strip all whitespace to shrink JSON payloads — with a clear before/after size and savings percentage. Runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="jm-input">Input <span class="field-hint">(paste formatted JSON)</span></label>
+      <textarea id="jm-input" class="textarea-taste" placeholder='{\n  "a": 1,\n  "b": [2, 3]\n}' spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="jm-output">Minified <span class="field-hint" id="jm-meta"></span></label>
+      <textarea id="jm-output" class="textarea-taste" placeholder="Minified JSON appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div id="jm-status" class="jm-status" hidden></div>
+  <div class="stat-row" id="jm-stats"></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="minify"><i class="bi bi-arrows-collapse"></i> Minify</button>
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    <button class="btn-taste btn-taste-ghost" data-act="swap"><i class="bi bi-arrow-down-up"></i> Swap</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<style>
+  .jm-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jm-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['json-minify'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#jm-input',root), output=$('#jm-output',root), meta=$('#jm-meta',root),
+        statusEl=$('#jm-status',root), stats=$('#jm-stats',root);
+    var SAVE='tool:json-minify:input';
+
+    function err(msg){ statusEl.hidden=false; statusEl.className='jm-status err';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-exclamation-triangle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+
+    function minify(){
+      var raw=input.value.trim();
+      stats.innerHTML='';
+      if(!raw){ output.value=''; meta.textContent=''; statusEl.hidden=true; Taste.toast('Paste some JSON first','info'); return; }
+      var obj;
+      try{ obj=JSON.parse(raw); statusEl.hidden=true; }
+      catch(e){ output.value=''; meta.textContent=''; err('Invalid JSON: '+e.message); Taste.toast('Invalid JSON','error'); return; }
+      var result=JSON.stringify(obj);
+      output.value=result;
+
+      var before=new Blob([raw]).size, after=new Blob([result]).size;
+      var saved=before-after, pct=before?Math.round((saved/before)*100):0;
+      meta.textContent=Taste.bytes(after);
+      [['bi-hdd', Taste.bytes(before)+' before'],['bi-hdd-fill', Taste.bytes(after)+' after'],
+       ['bi-graph-down-arrow', pct+'% smaller ('+Taste.bytes(Math.max(0,saved))+')']]
+      .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    var actions={
+      minify:minify,
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste-min.json',output.value,'application/json'):Taste.toast('Nothing to download','info'); },
+      swap:function(){ if(!output.value)return Taste.toast('No output to swap','info'); input.value=output.value; save(); },
+      sample:function(){ input.value='{\n  "name": "Project Taste",\n  "version": "0.1.0",\n  "tools": 127,\n  "tags": [ "dev", "utils", "json" ],\n  "meta": {\n    "open_source": true,\n    "stars": null\n  }\n}'; minify(); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; statusEl.hidden=true; stats.innerHTML=''; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); minify(); },{accept:/json|text/});
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); minify(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

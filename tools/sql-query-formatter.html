@@ -1,0 +1,137 @@
+<!-- =========================================================================
+     Project Taste — tools/sql-query-formatter.html
+     Multi-statement SQL batch tool: expand, compact, or minify.
+     TasteTools: window.TasteTools['sql-query-formatter'] = fn(root,tool,Taste)
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-database-check"></i></div>
+  <div class="tool-header-text">
+    <h1>SQL Query Formatter</h1>
+    <p>Clean up a whole batch of SQL statements at once — expand, compact to one line each, or fully minify. Statement-aware &amp; local.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="seg" role="tablist" aria-label="Mode">
+    <button class="seg-btn is-active" data-mode="expand" role="tab"><i class="bi bi-arrows-expand"></i> Expand</button>
+    <button class="seg-btn" data-mode="compact" role="tab"><i class="bi bi-list"></i> Compact</button>
+    <button class="seg-btn" data-mode="minify" role="tab"><i class="bi bi-arrows-collapse"></i> Minify</button>
+  </div>
+
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="sq-input">SQL batch <span class="field-hint">(multiple statements, ; separated)</span></label>
+      <textarea id="sq-input" class="textarea-taste" placeholder="insert into a values(1);select * from a;" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="sq-output">Output <span class="field-hint" id="sq-meta"></span></label>
+      <textarea id="sq-output" class="textarea-taste" placeholder="Result appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="run"><i class="bi bi-magic"></i> Process</button>
+    <label class="check-inline"><input type="checkbox" id="sq-upper"> Uppercase keywords</label>
+    <label class="check-inline"><input type="checkbox" id="sq-number"> Number statements</label>
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download .sql</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div class="stat-row" id="sq-stats"></div>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['sql-query-formatter'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, $$ = Taste.$$, el = Taste.el;
+    var input=$('#sq-input',root), output=$('#sq-output',root), meta=$('#sq-meta',root),
+        stats=$('#sq-stats',root), upperChk=$('#sq-upper',root), numberChk=$('#sq-number',root);
+    var mode='expand', SAVE='tool:sql-query-formatter:input';
+
+    var KEYWORDS=('SELECT FROM WHERE GROUP BY ORDER BY HAVING LIMIT OFFSET INNER LEFT RIGHT FULL CROSS JOIN ON '+
+      'AND OR NOT IN IS NULL LIKE BETWEEN AS DISTINCT INSERT INTO VALUES UPDATE SET DELETE CREATE TABLE ALTER '+
+      'DROP PRIMARY KEY FOREIGN REFERENCES DEFAULT UNION ALL ASC DESC CASE WHEN THEN ELSE END').split(/\s+/);
+    var CLAUSE=['SELECT','FROM','WHERE','GROUP BY','ORDER BY','HAVING','LIMIT','SET','VALUES','JOIN',
+      'LEFT JOIN','RIGHT JOIN','INNER JOIN','ON','AND','OR'];
+
+    function splitStatements(sql){
+      var out=[], cur='', q=null, i=0, n=sql.length;
+      while (i<n){
+        var c=sql[i], c2=sql[i+1];
+        if (q){ cur+=c; if(c===q&&sql[i-1]!=='\\') q=null; i++; continue; }
+        if (c==='-'&&c2==='-'){ var e=sql.indexOf('\n',i); e=e<0?n:e; cur+=sql.slice(i,e); i=e; continue; }
+        if (c==='/'&&c2==='*'){ var e2=sql.indexOf('*/',i); e2=e2<0?n:e2+2; cur+=sql.slice(i,e2); i=e2; continue; }
+        if (c==="'"||c==='"'||c==='`'){ q=c; cur+=c; i++; continue; }
+        if (c===';'){ if(cur.trim())out.push(cur.trim()); cur=''; i++; continue; }
+        cur+=c; i++;
+      }
+      if (cur.trim()) out.push(cur.trim());
+      return out;
+    }
+
+    function applyKeywordCase(stmt){
+      if (!upperChk.checked) return stmt;
+      return stmt.replace(/\b[A-Za-z_]+\b/g,function(w){
+        return KEYWORDS.indexOf(w.toUpperCase())!==-1 ? w.toUpperCase() : w;
+      });
+    }
+    function normalizeWs(stmt){ return stmt.replace(/\s+/g,' ').trim(); }
+    function expandStmt(stmt){
+      var s=normalizeWs(stmt);
+      CLAUSE.slice().sort(function(a,b){return b.length-a.length;}).forEach(function(kw){
+        var re=new RegExp('\\s+('+kw.replace(/ /g,'\\s+')+')\\b','gi');
+        s=s.replace(re,'\n$1');
+      });
+      return s.replace(/,\s*/g,',\n  ');
+    }
+
+    function process(){
+      var raw=input.value; stats.innerHTML='';
+      if(!raw.trim()){ output.value=''; meta.textContent=''; Taste.toast('Paste some SQL first','info'); return; }
+      var statements=splitStatements(raw).map(applyKeywordCase);
+      var pieces=statements.map(function(st,i){
+        var body;
+        if (mode==='minify') body=normalizeWs(st);
+        else if (mode==='compact') body=normalizeWs(st);
+        else body=expandStmt(st);
+        body=body+';';
+        if (numberChk.checked) body=(i+1)+'. '+body;
+        return body;
+      });
+      var joiner = mode==='minify' ? ' ' : (mode==='compact' ? '\n' : '\n\n');
+      output.value = mode==='minify' ? pieces.join(' ') : pieces.join(joiner);
+      meta.textContent = statements.length+' statement'+(statements.length===1?'':'s');
+      [['bi-collection', statements.length+' statements'],['bi-list-ol', output.value.split('\n').length+' lines'],
+       ['bi-hdd', Taste.bytes(new Blob([output.value]).size)]]
+      .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    var actions={
+      run:process,
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste-batch.sql',output.value,'text/plain'):Taste.toast('Nothing to download','info'); },
+      sample:function(){ input.value="create table users(id int primary key, name varchar(50)); insert into users values(1,'Ann'),(2,'Bo'); select id,name from users where id>0 order by name;"; process(); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; stats.innerHTML=''; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    Taste.on(root,'click','.seg-btn',function(e,node){
+      mode=node.dataset.mode;
+      $$('.seg-btn',root).forEach(function(b){ b.classList.toggle('is-active', b===node); });
+      if(input.value.trim()) process();
+    });
+    [upperChk,numberChk].forEach(function(c){ Taste.on(c,'change',function(){ if(output.value)process(); }); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); process(); },{accept:/sql|text/});
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); process(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

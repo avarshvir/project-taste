@@ -1,0 +1,166 @@
+<!-- =========================================================================
+     Project Taste — tools/jwt-inspector.html
+     Deep JWT analysis: claims, algorithm & security warnings.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['jwt-inspector'] = function(root,tool,Taste){}
+
+     Distinct from JWT Decoder: this focuses on ANALYSIS. It decodes the
+     token then runs a checklist — alg=none, missing exp, expired, weak
+     structure, oversized token, missing recommended claims — and grades the
+     token with pass/warn/fail rows. Read-only; no signature verification.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-search"></i></div>
+  <div class="tool-header-text">
+    <h1>JWT Inspector</h1>
+    <p>Decode a token and run a security checklist — algorithm, expiry, recommended claims and structure. Read-only, all local.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="ji-input">Token</label>
+    <textarea id="ji-input" class="textarea-taste" style="min-height:120px" placeholder="Paste a JWT to inspect…" spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="inspect"><i class="bi bi-search"></i> Inspect</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div id="ji-result" hidden>
+    <div class="stat-row" id="ji-stats"></div>
+
+    <label class="field-label">Security checklist</label>
+    <ul class="ji-checks" id="ji-checks"></ul>
+
+    <div class="tool-split" style="margin-top:var(--sp-3)">
+      <div class="field">
+        <label class="field-label">Header</label>
+        <div class="code-output" id="ji-header" style="max-height:160px"></div>
+      </div>
+      <div class="field">
+        <label class="field-label">Payload</label>
+        <div class="code-output" id="ji-payload" style="max-height:160px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .ji-checks { list-style:none; margin:0 0 var(--sp-2); padding:0; display:flex; flex-direction:column; gap:var(--sp-1); }
+  .ji-checks li { display:flex; align-items:flex-start; gap:var(--sp-2); padding:var(--sp-2) var(--sp-3);
+    border-radius:var(--radius-sm); font-size:var(--fs-sm); background:var(--surface-2); border:1px solid var(--border); }
+  .ji-checks li .bi { margin-top:.1em; }
+  .ji-pass .bi { color:var(--success); }
+  .ji-warn { background:var(--badge-hot-bg); }
+  .ji-warn .bi { color:var(--warning); }
+  .ji-fail { background:rgba(220,38,38,0.10); }
+  .ji-fail .bi { color:var(--danger); }
+  .ji-check-title { font-weight:var(--fw-semibold); }
+  .ji-check-desc { color:var(--text-muted); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['jwt-inspector'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#ji-input',root), resultEl=$('#ji-result',root), checksEl=$('#ji-checks',root),
+        statsEl=$('#ji-stats',root), headerEl=$('#ji-header',root), payloadEl=$('#ji-payload',root);
+    var SAVE='tool:jwt-inspector:input';
+
+    function b64urlDecode(part){
+      var s=part.replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='=';
+      var bin=atob(s); var bytes=new Uint8Array(bin.length);
+      for(var i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+      return new TextDecoder().decode(bytes);
+    }
+    function pretty(s){ try{ return JSON.stringify(JSON.parse(s),null,2); }catch(e){ return s; } }
+    function rel(sec){ var d=sec*1000-Date.now(), a=Math.abs(d);
+      var u=[['day',864e5],['hour',36e5],['minute',6e4],['second',1e3]];
+      for(var i=0;i<u.length;i++){ if(a>=u[i][1]||i===u.length-1){ var v=Math.round(a/u[i][1]);
+        return (d>=0?'in ':'')+v+' '+u[i][0]+(v===1?'':'s')+(d<0?' ago':''); } } }
+
+    function addCheck(kind,title,desc){
+      checksEl.appendChild(el('li',{class:'ji-'+kind},[
+        el('i',{class:'bi '+(kind==='pass'?'bi-check-circle-fill':kind==='warn'?'bi-exclamation-triangle-fill':'bi-x-circle-fill')}),
+        el('div',{},[ el('span',{class:'ji-check-title',text:title+'  '}), el('span',{class:'ji-check-desc',html:desc}) ])
+      ]));
+    }
+
+    function inspect(){
+      var raw=input.value.trim();
+      if(!raw){ resultEl.hidden=true; Taste.toast('Paste a JWT first','info'); return; }
+      var parts=raw.split('.');
+      if(parts.length<2){ resultEl.hidden=true; Taste.toast('Not a valid JWT (need 3 parts)','error'); return; }
+
+      var header, payload;
+      try{ header=JSON.parse(b64urlDecode(parts[0])); payload=JSON.parse(b64urlDecode(parts[1])); }
+      catch(e){ resultEl.hidden=true; Taste.toast('Could not decode token','error'); return; }
+
+      headerEl.textContent=pretty(JSON.stringify(header));
+      payloadEl.textContent=pretty(JSON.stringify(payload));
+      checksEl.innerHTML=''; statsEl.innerHTML='';
+
+      var now=Math.floor(Date.now()/1000);
+      var pass=0, warn=0, fail=0;
+      function P(t,d){ addCheck('pass',t,d); pass++; }
+      function W(t,d){ addCheck('warn',t,d); warn++; }
+      function F(t,d){ addCheck('fail',t,d); fail++; }
+
+      // alg checks
+      var alg=(header.alg||'').toString();
+      if (!alg) F('Algorithm missing','No <code>alg</code> in header.');
+      else if (/^none$/i.test(alg)) F('alg = none','Unsigned token — anyone can forge it. Never accept in production.');
+      else P('Algorithm set','Signed with <code>'+alg+'</code> (signature not verified here).');
+      if (header.typ && header.typ!=='JWT') W('Unusual typ','Header <code>typ</code> is <code>'+header.typ+'</code>, expected JWT.');
+
+      // exp / nbf / iat
+      if (payload.exp==null) W('No expiry','Token has no <code>exp</code> — it never expires. Consider adding one.');
+      else if (now>=payload.exp) F('Expired','Token expired '+rel(payload.exp)+'.');
+      else P('Not expired','Expires '+rel(payload.exp)+'.');
+
+      if (payload.nbf!=null && now<payload.nbf) W('Not yet valid','Becomes active '+rel(payload.nbf)+' (<code>nbf</code>).');
+      if (payload.iat==null) W('No issued-at','Missing <code>iat</code> — harder to reason about token age.');
+      else P('Issued-at present','Issued '+rel(payload.iat)+'.');
+
+      // recommended claims
+      ['iss','sub','aud'].forEach(function(c){
+        if (payload[c]==null) W('Missing '+c,'Recommended claim <code>'+c+'</code> not present.');
+      });
+
+      // size
+      var bytes=new Blob([raw]).size;
+      if (bytes>4096) W('Large token', (bytes)+' bytes — may exceed cookie/header limits.');
+      else P('Reasonable size', bytes+' bytes.');
+
+      // stats
+      [['bi-check-circle',pass+' pass','var(--success)'],['bi-exclamation-triangle',warn+' warn','var(--warning)'],
+       ['bi-x-circle',fail+' fail','var(--danger)'],['bi-key',Object.keys(payload).length+' claims','var(--accent)']]
+      .forEach(function(s){ statsEl.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0],style:'color:'+s[2]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+
+      resultEl.hidden=false;
+      Taste.toast(fail?'Issues found':'Inspection complete', fail?'error':'success');
+    }
+
+    var actions={
+      inspect:inspect,
+      sample:function(){ input.value='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFyc2h2aXIiLCJpYXQiOjE1MTYyMzkwMjJ9.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'; inspect(); save(); },
+      clear:function(){ input.value=''; resultEl.hidden=true; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t.trim(); save(); inspect(); });
+    Taste.on(input,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); inspect(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; }
+    input.focus();
+  };
+</script>

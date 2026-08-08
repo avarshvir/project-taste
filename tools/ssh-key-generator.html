@@ -1,0 +1,166 @@
+<!-- =========================================================================
+     Project Taste — tools/ssh-key-generator.html
+     Generate an SSH keypair (Ed25519 / RSA) in the browser.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['ssh-key-generator'] = function(root,tool,Taste){}
+
+     Real cryptography via Web Crypto SubtleCrypto:
+        RSA    → generateKey RSASSA-PKCS1-v1_5 (2048/3072/4096) → PEM public
+                 (SPKI) + PEM private (PKCS#8)
+        Ed25519→ generateKey when the browser supports it → PEM public/private
+     The OpenSSH "ssh-ed25519 AAAA… comment" public line is assembled from the
+     raw key for convenience. Keys are generated locally and never uploaded.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-terminal-fill"></i></div>
+  <div class="tool-header-text">
+    <h1>SSH Key Generator</h1>
+    <p>Generate a fresh Ed25519 or RSA keypair right in your browser using Web Crypto — private keys never leave the page.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="toolbar">
+    <label class="field-label" style="margin:0 var(--sp-2) 0 0">Type</label>
+    <div class="seg" role="tablist" aria-label="Key type">
+      <button class="seg-btn is-active" data-type="ed25519" role="tab"><i class="bi bi-lightning-charge"></i> Ed25519</button>
+      <button class="seg-btn" data-type="rsa" role="tab"><i class="bi bi-key"></i> RSA</button>
+    </div>
+    <label class="field-label" for="ssh-bits" id="ssh-bits-wrap" style="margin:0 var(--sp-1) 0 var(--sp-2); display:none">Bits</label>
+    <select id="ssh-bits" class="select-taste" style="width:auto; display:none">
+      <option value="2048">2048</option>
+      <option value="3072">3072</option>
+      <option value="4096">4096</option>
+    </select>
+    <input type="text" id="ssh-comment" class="input-taste" style="width:200px" placeholder="comment (e.g. arshvir@taste)" value="arshvir@taste">
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="generate"><i class="bi bi-arrow-repeat"></i> Generate Keypair</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div id="ssh-status" class="jx-status" hidden></div>
+
+  <div id="ssh-result" hidden>
+    <div class="field">
+      <label class="field-label">Public key <span class="field-hint">(OpenSSH / SPKI PEM)</span>
+        <button class="copy-inline" data-copy="pub" title="Copy public key" style="float:right;width:28px;height:28px"><i class="bi bi-clipboard"></i></button>
+      </label>
+      <textarea id="ssh-pub" class="textarea-taste" style="min-height:90px" readonly spellcheck="false"></textarea>
+    </div>
+
+    <div class="field">
+      <label class="field-label">Private key <span class="field-hint" style="color:var(--danger)">(PKCS#8 PEM — keep secret!)</span>
+        <button class="copy-inline" data-copy="priv" title="Copy private key" style="float:right;width:28px;height:28px"><i class="bi bi-clipboard"></i></button>
+      </label>
+      <textarea id="ssh-priv" class="textarea-taste" style="min-height:150px" readonly spellcheck="false"></textarea>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn-taste btn-taste-secondary" data-act="dlpub"><i class="bi bi-download"></i> Download public</button>
+      <button class="btn-taste btn-taste-secondary" data-act="dlpriv"><i class="bi bi-download"></i> Download private</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .jx-status.ok  { background:var(--badge-new-bg); color:var(--badge-new-text); }
+  .jx-status.warn{ background:var(--badge-hot-bg); color:var(--badge-hot-text); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['ssh-key-generator'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, $$ = Taste.$$, el = Taste.el;
+    var typeSegs=$$('.seg-btn',root), bitsSel=$('#ssh-bits',root), bitsWrap=$('#ssh-bits-wrap',root),
+        commentEl=$('#ssh-comment',root), statusEl=$('#ssh-status',root), resultEl=$('#ssh-result',root),
+        pubEl=$('#ssh-pub',root), privEl=$('#ssh-priv',root);
+    var keyType='ed25519';
+
+    function status(kind,msg){ statusEl.hidden=false; statusEl.className='jx-status '+kind;
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi '+(kind==='ok'?'bi-check-circle-fill':kind==='warn'?'bi-exclamation-triangle-fill':'bi-x-circle-fill')}));
+      statusEl.appendChild(el('span',{html:msg})); }
+
+    function ab2b64(buf){
+      var bytes=new Uint8Array(buf), bin='';
+      for(var i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+      return btoa(bin);
+    }
+    function pem(label, b64){
+      var lines=b64.match(/.{1,64}/g).join('\n');
+      return '-----BEGIN '+label+'-----\n'+lines+'\n-----END '+label+'-----';
+    }
+
+    // Build an OpenSSH ed25519 public line from the raw 32-byte key
+    function opensshEd25519(rawPub, comment){
+      function str(bytes){
+        var len=bytes.length, head=[(len>>>24)&255,(len>>>16)&255,(len>>>8)&255,len&255];
+        return head.concat(Array.prototype.slice.call(bytes));
+      }
+      var typeBytes=new TextEncoder().encode('ssh-ed25519');
+      var blob=str(typeBytes).concat(str(new Uint8Array(rawPub)));
+      var bin=''; blob.forEach(function(b){ bin+=String.fromCharCode(b); });
+      return 'ssh-ed25519 '+btoa(bin)+(comment?(' '+comment):'');
+    }
+
+    async function generate(){
+      status('warn','Generating… this can take a moment for large RSA keys.');
+      resultEl.hidden=true;
+      var comment=commentEl.value.trim();
+      try{
+        if (keyType==='ed25519'){
+          var kp;
+          try{
+            kp=await crypto.subtle.generateKey({name:'Ed25519'}, true, ['sign','verify']);
+          }catch(e){
+            status('err','This browser doesn\'t expose Ed25519 in Web Crypto yet. Try the RSA type instead.');
+            return;
+          }
+          var rawPub=await crypto.subtle.exportKey('raw', kp.publicKey);
+          var pkcs8=await crypto.subtle.exportKey('pkcs8', kp.privateKey);
+          pubEl.value=opensshEd25519(rawPub, comment)+'\n\n'+pem('PUBLIC KEY', ab2b64(await crypto.subtle.exportKey('spki', kp.publicKey)));
+          privEl.value=pem('PRIVATE KEY', ab2b64(pkcs8));
+          status('ok','Ed25519 keypair generated ✓ — private key stays in your browser.');
+        } else {
+          var bits=parseInt(bitsSel.value,10)||2048;
+          var kp2=await crypto.subtle.generateKey(
+            { name:'RSASSA-PKCS1-v1_5', modulusLength:bits, publicExponent:new Uint8Array([1,0,1]), hash:'SHA-256' },
+            true, ['sign','verify']);
+          var spki=await crypto.subtle.exportKey('spki', kp2.publicKey);
+          var pkcs8b=await crypto.subtle.exportKey('pkcs8', kp2.privateKey);
+          pubEl.value=pem('PUBLIC KEY', ab2b64(spki));
+          privEl.value=pem('PRIVATE KEY', ab2b64(pkcs8b));
+          status('ok','RSA '+bits+'-bit keypair generated ✓ — private key stays in your browser.');
+        }
+        resultEl.hidden=false;
+      }catch(err){
+        status('err','Key generation failed: '+err.message);
+      }
+    }
+
+    var actions={
+      generate:function(){ generate(); },
+      clear:function(){ pubEl.value=''; privEl.value=''; resultEl.hidden=true; statusEl.hidden=true; },
+      dlpub:function(){ pubEl.value?Taste.download(keyType==='ed25519'?'id_ed25519.pub':'id_rsa.pub', pubEl.value):Taste.toast('Generate first','info'); },
+      dlpriv:function(){ privEl.value?Taste.download(keyType==='ed25519'?'id_ed25519':'id_rsa', privEl.value):Taste.toast('Generate first','info'); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    Taste.on(root,'click','[data-copy]',function(e,node){ e.preventDefault();
+      Taste.copy(node.dataset.copy==='pub'?pubEl.value:privEl.value); });
+
+    Taste.on(root,'click','.seg-btn',function(e,node){
+      keyType=node.dataset.type;
+      typeSegs.forEach(function(b){ b.classList.toggle('is-active', b===node); });
+      var isRsa=keyType==='rsa';
+      bitsSel.style.display=isRsa?'':'none';
+      bitsWrap.style.display=isRsa?'':'none';
+    });
+  };
+</script>

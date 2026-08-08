@@ -1,0 +1,205 @@
+<!-- =========================================================================
+     Project Taste — tools/json-compare.html
+     Structural (semantic) diff of two JSON documents.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['json-compare'] = function(root,tool,Taste){}
+
+     Unlike a text diff, this compares the PARSED structures — so key order
+     and formatting don't matter. It walks both objects recursively and
+     reports added / removed / changed / unchanged paths (dot + [index]).
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-columns-gap"></i></div>
+  <div class="tool-header-text">
+    <h1>JSON Compare</h1>
+    <p>Compare two JSON documents structurally — ignoring key order and whitespace. See exactly which paths were added, removed or changed.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="jc-left">JSON A</label>
+      <textarea id="jc-left" class="textarea-taste" placeholder='{"a":1,"b":{"c":2}}' spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="jc-right">JSON B</label>
+      <textarea id="jc-right" class="textarea-taste" placeholder='{"a":1,"b":{"c":3},"d":4}' spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="compare"><i class="bi bi-columns-gap"></i> Compare</button>
+    <label class="check-inline"><input type="checkbox" id="jc-unchanged"> Show unchanged</label>
+    <button class="btn-taste btn-taste-secondary" data-act="swap"><i class="bi bi-arrow-left-right"></i> Swap A/B</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <div id="jc-status" class="jc-status" hidden></div>
+  <div class="stat-row" id="jc-stats"></div>
+
+  <label class="field-label">Differences</label>
+  <div class="jc-diff" id="jc-out">
+    <p class="no-results" style="text-align:center">Paste JSON into both panes and hit Compare.</p>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-secondary" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy Report</button>
+  </div>
+</div>
+
+<style>
+  .jc-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jc-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .jc-status.ok  { background:var(--badge-new-bg); color:var(--badge-new-text); }
+  .jc-diff { font-family:var(--font-mono); font-size:var(--fs-sm); background:var(--code-bg);
+    border:1px solid var(--border); border-radius:var(--radius-md); overflow:auto; max-height:460px; }
+  .jc-row { display:flex; gap:var(--sp-2); padding:var(--sp-1) var(--sp-3); white-space:pre-wrap; word-break:break-word; }
+  .jc-row .badge-taste { flex:0 0 auto; }
+  .jc-row.add     { background:rgba(5,150,105,0.12); }
+  .jc-row.del     { background:rgba(220,38,38,0.12); }
+  .jc-row.chg     { background:rgba(217,119,6,0.12); }
+  .jc-path { color:var(--accent); }
+  .jc-val  { color:var(--text-muted); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['json-compare'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var left=$('#jc-left',root), right=$('#jc-right',root), out=$('#jc-out',root),
+        statusEl=$('#jc-status',root), stats=$('#jc-stats',root), showUnchanged=$('#jc-unchanged',root);
+    var LS='tool:json-compare:left', RS='tool:json-compare:right';
+    var lastReport=[];
+
+    function isObj(v){ return v && typeof v==='object'; }
+    function fmt(v){ return typeof v==='string' ? '"'+v+'"' : JSON.stringify(v); }
+
+    // Recursively diff two values at a given path
+    function diff(a, b, path, acc){
+      if (Array.isArray(a) && Array.isArray(b)){
+        var max=Math.max(a.length,b.length);
+        for (var i=0;i<max;i++){
+          var p=path+'['+i+']';
+          if (i>=a.length) acc.push({t:'add',path:p,b:b[i]});
+          else if (i>=b.length) acc.push({t:'del',path:p,a:a[i]});
+          else diff(a[i],b[i],p,acc);
+        }
+      } else if (isObj(a) && isObj(b)){
+        var keys={};
+        Object.keys(a).forEach(function(k){ keys[k]=true; });
+        Object.keys(b).forEach(function(k){ keys[k]=true; });
+        Object.keys(keys).sort().forEach(function(k){
+          var p=path?path+'.'+k:k;
+          var ina=Object.prototype.hasOwnProperty.call(a,k);
+          var inb=Object.prototype.hasOwnProperty.call(b,k);
+          if (!ina) acc.push({t:'add',path:p,b:b[k]});
+          else if (!inb) acc.push({t:'del',path:p,a:a[k]});
+          else diff(a[k],b[k],p,acc);
+        });
+      } else {
+        if (JSON.stringify(a)===JSON.stringify(b)) acc.push({t:'same',path:path||'(root)',a:a});
+        else acc.push({t:'chg',path:path||'(root)',a:a,b:b});
+      }
+      return acc;
+    }
+
+    var BADGE={ add:['badge-new','+ added'], del:['badge-hot','− removed'], chg:['badge-niche','~ changed'], same:['','= same'] };
+
+    function render(report){
+      out.innerHTML='';
+      var shown=report.filter(function(r){ return showUnchanged.checked || r.t!=='same'; });
+      if (!shown.length){
+        out.innerHTML='<p class="no-results" style="text-align:center">'+
+          (report.length?'No differences — the documents are structurally identical. ✓':'Nothing to compare.')+'</p>';
+        return;
+      }
+      shown.forEach(function(r){
+        var cls = r.t==='add'?'add':r.t==='del'?'del':r.t==='chg'?'chg':'';
+        var row=el('div',{class:'jc-row '+cls});
+        var b=BADGE[r.t];
+        if (b[0]) row.appendChild(el('span',{class:'badge-taste '+b[0],text:b[1]}));
+        var body;
+        if (r.t==='add') body='<span class="jc-path">'+Taste.escapeHtml(r.path)+'</span> = <span class="jc-val">'+Taste.escapeHtml(fmt(r.b))+'</span>';
+        else if (r.t==='del') body='<span class="jc-path">'+Taste.escapeHtml(r.path)+'</span> = <span class="jc-val">'+Taste.escapeHtml(fmt(r.a))+'</span>';
+        else if (r.t==='chg') body='<span class="jc-path">'+Taste.escapeHtml(r.path)+'</span>: <span class="jc-val">'+Taste.escapeHtml(fmt(r.a))+'</span> → <span class="jc-val">'+Taste.escapeHtml(fmt(r.b))+'</span>';
+        else body='<span class="jc-path">'+Taste.escapeHtml(r.path)+'</span> = <span class="jc-val">'+Taste.escapeHtml(fmt(r.a))+'</span>';
+        row.appendChild(el('span',{html:body}));
+        out.appendChild(row);
+      });
+    }
+
+    function renderStats(report){
+      stats.innerHTML='';
+      var c={add:0,del:0,chg:0,same:0};
+      report.forEach(function(r){ c[r.t]++; });
+      [['bi-plus-circle',c.add+' added','var(--success)'],
+       ['bi-dash-circle',c.del+' removed','var(--danger)'],
+       ['bi-arrow-left-right',c.chg+' changed','var(--warning)'],
+       ['bi-check2',c.same+' same','var(--accent)']]
+      .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0],style:'color:'+s[2]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    function err(msg){ statusEl.hidden=false; statusEl.className='jc-status err';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-exclamation-triangle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+    function ok(msg){ statusEl.hidden=false; statusEl.className='jc-status ok';
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi bi-check-circle-fill'}));
+      statusEl.appendChild(el('span',{text:msg})); }
+
+    function compare(){
+      if(!left.value.trim()&&!right.value.trim()){ Taste.toast('Paste JSON in both panes','info'); return; }
+      var a,b;
+      try{ a=JSON.parse(left.value); }catch(e){ err('JSON A is invalid: '+e.message); Taste.toast('JSON A invalid','error'); return; }
+      try{ b=JSON.parse(right.value); }catch(e){ err('JSON B is invalid: '+e.message); Taste.toast('JSON B invalid','error'); return; }
+
+      lastReport=diff(a,b,'',[]);
+      var diffs=lastReport.filter(function(r){ return r.t!=='same'; }).length;
+      diffs? err(diffs+' difference'+(diffs===1?'':'s')+' found.') : ok('Structurally identical ✓');
+      renderStats(lastReport);
+      render(lastReport);
+    }
+
+    function reportText(){
+      return lastReport.filter(function(r){ return showUnchanged.checked||r.t!=='same'; })
+        .map(function(r){
+          if(r.t==='add') return '+ '+r.path+' = '+fmt(r.b);
+          if(r.t==='del') return '- '+r.path+' = '+fmt(r.a);
+          if(r.t==='chg') return '~ '+r.path+': '+fmt(r.a)+' -> '+fmt(r.b);
+          return '  '+r.path+' = '+fmt(r.a);
+        }).join('\n');
+    }
+
+    var actions={
+      compare:compare,
+      swap:function(){ var t=left.value; left.value=right.value; right.value=t; save(); compare(); },
+      copy:function(){ lastReport.length?Taste.copy(reportText()):Taste.toast('Nothing to copy','info'); },
+      sample:function(){
+        left.value='{"name":"Taste","version":"0.1.0","tools":120,"tags":["dev","utils"]}';
+        right.value='{"name":"Taste","version":"0.2.0","tools":127,"tags":["dev","json"],"stars":42}';
+        save(); compare();
+      },
+      clear:function(){ left.value=''; right.value=''; out.innerHTML='<p class="no-results" style="text-align:center">Paste JSON into both panes and hit Compare.</p>';
+        stats.innerHTML=''; statusEl.hidden=true; lastReport=[]; Taste.store.remove(LS); Taste.store.remove(RS); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    Taste.on(showUnchanged,'change',function(){ if(lastReport.length){ render(lastReport); } });
+
+    var save=Taste.debounce(function(){ Taste.store.set(LS,left.value); Taste.store.set(RS,right.value); },400);
+    Taste.on(left,'input',save); Taste.on(right,'input',save);
+    Taste.dropzone(left,function(t){ left.value=t; save(); compare(); },{accept:/json|text/});
+    Taste.dropzone(right,function(t){ right.value=t; save(); compare(); },{accept:/json|text/});
+
+    var sl=Taste.store.get(LS,''), sr=Taste.store.get(RS,'');
+    if(sl) left.value=sl; if(sr) right.value=sr;
+    if(sl||sr) compare();
+    left.focus();
+  };
+</script>

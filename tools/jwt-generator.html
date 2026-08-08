@@ -1,0 +1,154 @@
+<!-- =========================================================================
+     Project Taste — tools/jwt-generator.html
+     Build & sign a JSON Web Token (HS256 / HS384 / HS512) in the browser.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['jwt-generator'] = function(root,tool,Taste){}
+
+     Distinct from JWT Decoder/Inspector: this CREATES tokens. Signing uses
+     the Web Crypto SubtleCrypto HMAC API (async) so the signature is real,
+     not faked. Base64URL encoding is UTF-8 safe. Everything is local — the
+     secret never leaves the browser.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-key-fill"></i></div>
+  <div class="tool-header-text">
+    <h1>JWT Generator</h1>
+    <p>Build and sign a real JSON Web Token (HMAC) right in your browser — your secret never leaves the page.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="jg-payload">Payload (JSON)</label>
+      <textarea id="jg-payload" class="textarea-taste" placeholder='{"sub":"1234","name":"Arshvir"}' spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="jg-token">Signed token <span class="field-hint" id="jg-meta"></span></label>
+      <textarea id="jg-token" class="textarea-taste" placeholder="Your signed JWT appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <label class="field-label" for="jg-alg" style="margin:0 var(--sp-1) 0 0">Algorithm</label>
+    <select id="jg-alg" class="select-taste" style="width:auto">
+      <option value="HS256">HS256</option>
+      <option value="HS384">HS384</option>
+      <option value="HS512">HS512</option>
+    </select>
+    <label class="check-inline"><input type="checkbox" id="jg-iat" checked> Add <code>iat</code></label>
+    <label class="check-inline"><input type="checkbox" id="jg-exp"> Add <code>exp</code></label>
+    <input type="number" id="jg-ttl" class="input-taste" style="width:90px" min="1" value="60" title="exp = now + N minutes">
+    <span class="field-hint">min TTL</span>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="jg-secret">Secret <span class="field-hint">(HMAC shared key — stays local)</span></label>
+    <div class="input-row">
+      <input type="text" id="jg-secret" class="input-taste" placeholder="your-256-bit-secret" spellcheck="false" value="taste-secret">
+      <button class="copy-inline" data-act="gensecret" title="Generate random secret"><i class="bi bi-shuffle"></i></button>
+    </div>
+  </div>
+
+  <div id="jg-status" class="jx-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="sign"><i class="bi bi-pen"></i> Sign Token</button>
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy Token</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<style>
+  .jx-status { padding:var(--sp-2) var(--sp-3); margin-bottom:var(--sp-3); border-radius:var(--radius-md);
+    font-size:var(--fs-sm); font-weight:var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .jx-status.ok  { background:var(--badge-new-bg); color:var(--badge-new-text); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['jwt-generator'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var payloadEl=$('#jg-payload',root), tokenEl=$('#jg-token',root), meta=$('#jg-meta',root),
+        algSel=$('#jg-alg',root), iatChk=$('#jg-iat',root), expChk=$('#jg-exp',root), ttlEl=$('#jg-ttl',root),
+        secretEl=$('#jg-secret',root), statusEl=$('#jg-status',root);
+    var SAVE='tool:jwt-generator:payload';
+
+    // Base64URL encode a byte array or string
+    function b64url(bytes){
+      var bin='';
+      if (typeof bytes==='string'){ bin=bytes; }
+      else { for (var i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]); }
+      return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    }
+    function b64urlStr(str){
+      var bytes=new TextEncoder().encode(str);
+      return b64url(bytes);
+    }
+
+    function status(kind,msg){ statusEl.hidden=false; statusEl.className='jx-status '+kind;
+      statusEl.innerHTML=''; statusEl.appendChild(el('i',{class:'bi '+(kind==='ok'?'bi-check-circle-fill':'bi-exclamation-triangle-fill')}));
+      statusEl.appendChild(el('span',{html:msg})); }
+
+    async function sign(){
+      var payloadRaw=payloadEl.value.trim();
+      if(!payloadRaw){ Taste.toast('Add a JSON payload first','info'); return; }
+      var payload;
+      try{ payload=JSON.parse(payloadRaw); }
+      catch(e){ status('err','Invalid JSON payload: '+e.message); Taste.toast('Invalid payload','error'); return; }
+
+      var now=Math.floor(Date.now()/1000);
+      if (iatChk.checked) payload.iat=now;
+      if (expChk.checked){ var ttl=parseInt(ttlEl.value,10)||60; payload.exp=now+ttl*60; }
+
+      var alg=algSel.value;
+      var header={ alg:alg, typ:'JWT' };
+      var headerB64=b64urlStr(JSON.stringify(header));
+      var payloadB64=b64urlStr(JSON.stringify(payload));
+      var signingInput=headerB64+'.'+payloadB64;
+
+      var hashName={ HS256:'SHA-256', HS384:'SHA-384', HS512:'SHA-512' }[alg];
+      try{
+        var key=await crypto.subtle.importKey('raw', new TextEncoder().encode(secretEl.value),
+          { name:'HMAC', hash:hashName }, false, ['sign']);
+        var sig=await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signingInput));
+        var sigB64=b64url(new Uint8Array(sig));
+        var token=signingInput+'.'+sigB64;
+        tokenEl.value=token;
+        meta.textContent=token.length+' chars';
+        status('ok','Signed with '+alg+' ✓ — payload has '+Object.keys(payload).length+' claim(s).');
+        // reflect any auto-added claims back into the payload box (pretty)
+        payloadEl.value=JSON.stringify(payload,null,2);
+      }catch(err){
+        status('err','Signing failed: '+err.message); Taste.toast('Signing failed','error');
+      }
+    }
+
+    function randomSecret(){
+      var bytes=new Uint8Array(24); crypto.getRandomValues(bytes);
+      secretEl.value=b64url(bytes);
+    }
+
+    var actions={
+      sign:function(){ sign(); },
+      gensecret:randomSecret,
+      copy:function(){ Taste.copy(tokenEl.value); },
+      download:function(){ tokenEl.value?Taste.download('taste.jwt',tokenEl.value):Taste.toast('Sign a token first','info'); },
+      sample:function(){ payloadEl.value='{\n  "sub": "1234567890",\n  "name": "Arshvir",\n  "role": "admin"\n}'; expChk.checked=true; sign(); save(); },
+      clear:function(){ payloadEl.value=''; tokenEl.value=''; meta.textContent=''; statusEl.hidden=true; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ e.preventDefault(); var f=actions[n.dataset.act]; if(f)f(); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,payloadEl.value); },400);
+    Taste.on(payloadEl,'input',save);
+    Taste.on(payloadEl,'keydown',function(e){ if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){ e.preventDefault(); sign(); } });
+    var saved=Taste.store.get(SAVE,''); if(saved) payloadEl.value=saved;
+    payloadEl.focus();
+  };
+</script>

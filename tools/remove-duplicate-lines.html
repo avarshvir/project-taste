@@ -1,0 +1,105 @@
+<!-- =========================================================================
+     Project Taste — tools/remove-duplicate-lines.html
+     Remove duplicate lines from text, with options.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['remove-duplicate-lines'] = function(root,tool,Taste){}
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-recycle"></i></div>
+  <div class="tool-header-text">
+    <h1>Remove Duplicate Lines</h1>
+    <p>Strip repeated lines and keep only unique ones — with options for case, whitespace and sorting. Runs locally.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="rd-input">Input <span class="field-hint">(one item per line)</span></label>
+      <textarea id="rd-input" class="textarea-taste" placeholder="Paste lines here…" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="rd-output">Output <span class="field-hint" id="rd-meta"></span></label>
+      <textarea id="rd-output" class="textarea-taste" placeholder="Unique lines appear here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="run"><i class="bi bi-recycle"></i> Remove Duplicates</button>
+    <label class="check-inline"><input type="checkbox" id="rd-case"> Ignore case</label>
+    <label class="check-inline"><input type="checkbox" id="rd-trim"> Ignore leading/trailing spaces</label>
+    <label class="check-inline"><input type="checkbox" id="rd-sort"> Sort result</label>
+    <label class="check-inline"><input type="checkbox" id="rd-keepblank"> Keep blank lines</label>
+  </div>
+
+  <div class="stat-row" id="rd-stats"></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-secondary" data-act="download"><i class="bi bi-download"></i> Download</button>
+    <button class="btn-taste btn-taste-ghost" data-act="swap"><i class="bi bi-arrow-down-up"></i> Swap</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['remove-duplicate-lines'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+    var input=$('#rd-input',root), output=$('#rd-output',root), meta=$('#rd-meta',root), stats=$('#rd-stats',root);
+    var igCase=$('#rd-case',root), igTrim=$('#rd-trim',root), doSort=$('#rd-sort',root), keepBlank=$('#rd-keepblank',root);
+    var SAVE='tool:remove-duplicate-lines:input';
+
+    function keyOf(line){
+      var k = line;
+      if (igTrim.checked) k = k.trim();
+      if (igCase.checked) k = k.toLowerCase();
+      return k;
+    }
+
+    function run(){
+      var lines = input.value.split('\n');
+      var seen = {}, out = [], dupes = 0;
+      lines.forEach(function(line){
+        if (!keepBlank.checked && line.trim()==='') return;
+        var k = keyOf(line);
+        if (Object.prototype.hasOwnProperty.call(seen,k)) { dupes++; return; }
+        seen[k] = true;
+        out.push(line);
+      });
+      if (doSort.checked) out.sort(function(a,b){ return a.localeCompare(b); });
+      output.value = out.join('\n');
+      meta.textContent = out.length + ' unique · ' + dupes + ' removed';
+      renderStats(lines.length, out.length, dupes);
+    }
+
+    function renderStats(total, unique, dupes){
+      stats.innerHTML='';
+      [['bi-list-ol', total+' input lines'],['bi-check2-circle', unique+' unique'],['bi-trash', dupes+' removed']]
+      .forEach(function(s){ stats.appendChild(el('span',{class:'stat-chip'},[
+        el('i',{class:'bi '+s[0]}), el('strong',{text:String(s[1]).split(' ')[0]}),
+        document.createTextNode(' '+s[1].split(' ').slice(1).join(' '))]));});
+    }
+
+    var actions={
+      run:run,
+      copy:function(){ Taste.copy(output.value); },
+      download:function(){ output.value?Taste.download('taste-unique-lines.txt',output.value):Taste.toast('Nothing to download','info'); },
+      swap:function(){ if(!output.value)return Taste.toast('No output to swap','info'); input.value=output.value; save(); run(); },
+      sample:function(){ input.value='apple\nbanana\napple\nCherry\ncherry\n\nbanana\ndate'; run(); save(); },
+      clear:function(){ input.value=''; output.value=''; meta.textContent=''; stats.innerHTML=''; Taste.store.remove(SAVE); }
+    };
+    Taste.on(root,'click','[data-act]',function(e,n){ var f=actions[n.dataset.act]; if(f)f(); });
+    [igCase,igTrim,doSort,keepBlank].forEach(function(c){ Taste.on(c,'change',function(){ if(output.value||input.value)run(); }); });
+
+    var save=Taste.debounce(function(){ Taste.store.set(SAVE,input.value); },400);
+    Taste.on(input,'input',save);
+    Taste.dropzone(input,function(t){ input.value=t; save(); run(); Taste.toast('File loaded','success'); });
+    var saved=Taste.store.get(SAVE,''); if(saved){ input.value=saved; run(); }
+    input.focus();
+  };
+</script>

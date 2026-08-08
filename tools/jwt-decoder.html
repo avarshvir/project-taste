@@ -1,0 +1,263 @@
+<!-- =========================================================================
+     Project Taste — tools/jwt-decoder.html
+     Decode a JSON Web Token into header · payload · signature.
+
+     Fragment injected by router.js. TasteTools contract:
+         window.TasteTools['jwt-decoder'] = function (root, tool, Taste){...}
+
+     IMPORTANT: this DECODES (reads) a token — it does NOT verify the
+     signature (that requires the secret/public key and is intentionally
+     out of scope for a client-side inspector). We clearly label this.
+
+     Base64URL decoding is UTF-8 safe (TextDecoder), and standard time
+     claims (exp / iat / nbf) are rendered as human dates with a live
+     validity status.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-key"></i></div>
+  <div class="tool-header-text">
+    <h1>JWT Decoder</h1>
+    <p>Inspect a JSON Web Token's header, payload and signature — with human-readable expiry. Decoding happens entirely in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="jwt-input">Token <span class="field-hint">(paste a JWT — three Base64URL parts separated by dots)</span></label>
+    <textarea id="jwt-input" class="textarea-taste" style="min-height:130px"
+      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0In0.signature" spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="decode"><i class="bi bi-box-arrow-in-down"></i> Decode</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+
+  <!-- validity / expiry banner -->
+  <div id="jwt-status" class="jwt-status" hidden></div>
+
+  <!-- decoded output -->
+  <div id="jwt-result" hidden>
+    <div class="tool-split">
+      <div class="field">
+        <label class="field-label"><i class="bi bi-card-heading" style="color:var(--accent)"></i> Header
+          <button class="copy-inline" data-copy="header" title="Copy header" style="float:right;width:28px;height:28px"><i class="bi bi-clipboard"></i></button>
+        </label>
+        <div class="code-output" id="jwt-header"></div>
+      </div>
+      <div class="field">
+        <label class="field-label"><i class="bi bi-file-earmark-text" style="color:var(--accent)"></i> Payload
+          <button class="copy-inline" data-copy="payload" title="Copy payload" style="float:right;width:28px;height:28px"><i class="bi bi-clipboard"></i></button>
+        </label>
+        <div class="code-output" id="jwt-payload"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label"><i class="bi bi-pen" style="color:var(--accent)"></i> Signature <span class="field-hint">(not verified — inspection only)</span></label>
+      <div class="code-output" id="jwt-signature" style="max-height:80px"></div>
+    </div>
+
+    <!-- claim table for recognised standard claims -->
+    <div id="jwt-claims"></div>
+  </div>
+</div>
+
+<style>
+  .jwt-status { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-2) var(--sp-3);
+    margin-bottom:var(--sp-4); border-radius:var(--radius-md); font-size:var(--fs-sm); font-weight:var(--fw-medium); }
+  .jwt-status.ok   { background:var(--badge-new-bg); color:var(--badge-new-text); }
+  .jwt-status.warn { background:var(--badge-hot-bg); color:var(--badge-hot-text); }
+  .jwt-status.err  { background:rgba(220,38,38,0.12); color:var(--danger); }
+  .jwt-claims { margin-top:var(--sp-4); }
+  .jwt-claims table { width:100%; border-collapse:collapse; font-size:var(--fs-sm); }
+  .jwt-claims th, .jwt-claims td { text-align:left; padding:var(--sp-2) var(--sp-3); border-bottom:1px solid var(--border); }
+  .jwt-claims th { color:var(--text-subtle); font-weight:var(--fw-semibold); font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.05em; }
+  .jwt-claims td code { font-size:.85em; }
+  .jwt-claims td:first-child { font-family:var(--font-mono); color:var(--accent); white-space:nowrap; }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['jwt-decoder'] = function (root, tool, Taste) {
+    'use strict';
+    var $ = Taste.$, el = Taste.el;
+
+    var input   = $('#jwt-input', root);
+    var statusEl= $('#jwt-status', root);
+    var resultEl= $('#jwt-result', root);
+    var headerEl= $('#jwt-header', root);
+    var payloadEl=$('#jwt-payload', root);
+    var sigEl   = $('#jwt-signature', root);
+    var claimsEl= $('#jwt-claims', root);
+    var SAVE_KEY= 'tool:jwt-decoder:input';
+    var decoded = { header:'', payload:'' };
+
+    /* ---- Base64URL → string (UTF-8 safe) ---- */
+    function b64urlDecode(part) {
+      var s = part.replace(/-/g, '+').replace(/_/g, '/');
+      while (s.length % 4) s += '=';
+      var bin = atob(s);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return new TextDecoder().decode(bytes);
+    }
+
+    function pretty(jsonStr) {
+      try { return JSON.stringify(JSON.parse(jsonStr), null, 2); }
+      catch (e) { return jsonStr; }
+    }
+
+    function showStatus(kind, msg) {
+      statusEl.hidden = false;
+      statusEl.className = 'jwt-status ' + kind;
+      statusEl.innerHTML = '';
+      var icon = kind === 'ok' ? 'bi-check-circle-fill'
+               : kind === 'warn' ? 'bi-exclamation-triangle-fill'
+               : 'bi-x-circle-fill';
+      statusEl.appendChild(el('i', { class: 'bi ' + icon }));
+      statusEl.appendChild(el('span', { html: msg }));
+    }
+
+    /* ---- humanize a unix-seconds timestamp ---- */
+    function fmtTime(sec) {
+      var d = new Date(sec * 1000);
+      return d.toLocaleString() + '  (' + d.toISOString() + ')';
+    }
+    function relative(sec) {
+      var diff = sec * 1000 - Date.now();
+      var abs = Math.abs(diff);
+      var units = [['day',864e5],['hour',36e5],['minute',6e4],['second',1e3]];
+      for (var i=0;i<units.length;i++){
+        if (abs >= units[i][1] || i===units.length-1){
+          var v = Math.round(abs/units[i][1]);
+          var label = v + ' ' + units[i][0] + (v===1?'':'s');
+          return diff >= 0 ? 'in ' + label : label + ' ago';
+        }
+      }
+    }
+
+    var CLAIM_NAMES = {
+      iss:'Issuer', sub:'Subject', aud:'Audience', exp:'Expires', nbf:'Not before',
+      iat:'Issued at', jti:'JWT ID', azp:'Authorized party', scope:'Scope'
+    };
+
+    function renderClaims(payloadObj) {
+      claimsEl.innerHTML = '';
+      if (!payloadObj || typeof payloadObj !== 'object') return;
+      var timeClaims = ['exp','iat','nbf'];
+      var rows = [];
+      Object.keys(payloadObj).forEach(function (k) {
+        var v = payloadObj[k];
+        var human = '';
+        if (timeClaims.indexOf(k) !== -1 && typeof v === 'number') {
+          human = fmtTime(v) + ' · ' + relative(v);
+        }
+        rows.push([k, CLAIM_NAMES[k] || '', human || (typeof v === 'object' ? JSON.stringify(v) : String(v))]);
+      });
+      if (!rows.length) return;
+
+      var table = el('table', {});
+      table.appendChild(el('thead', {}, [ el('tr', {}, [
+        el('th', { text:'Claim' }), el('th', { text:'Name' }), el('th', { text:'Value' })
+      ]) ]));
+      var tb = el('tbody', {});
+      rows.forEach(function (r) {
+        tb.appendChild(el('tr', {}, [
+          el('td', { text:r[0] }), el('td', { text:r[1] }), el('td', { text:r[2] })
+        ]));
+      });
+      table.appendChild(tb);
+      claimsEl.appendChild(el('label', { class:'field-label', text:'Standard claims' }));
+      claimsEl.appendChild(table);
+    }
+
+    function evaluateValidity(payloadObj) {
+      var now = Math.floor(Date.now()/1000);
+      if (payloadObj && typeof payloadObj.exp === 'number' && now >= payloadObj.exp) {
+        return showStatus('err', 'Token <strong>expired</strong> ' + relative(payloadObj.exp) + '.');
+      }
+      if (payloadObj && typeof payloadObj.nbf === 'number' && now < payloadObj.nbf) {
+        return showStatus('warn', 'Token <strong>not yet valid</strong> — active ' + relative(payloadObj.nbf) + '.');
+      }
+      if (payloadObj && typeof payloadObj.exp === 'number') {
+        return showStatus('ok', 'Decoded ✓ — expires ' + relative(payloadObj.exp) + '. <em>Signature not verified.</em>');
+      }
+      return showStatus('ok', 'Decoded ✓ — no expiry claim. <em>Signature not verified.</em>');
+    }
+
+    /* ---- core decode ---- */
+    function decode() {
+      var raw = input.value.trim();
+      if (!raw) { resultEl.hidden = true; statusEl.hidden = true; Taste.toast('Paste a JWT first', 'info'); return; }
+
+      var parts = raw.split('.');
+      if (parts.length < 2) {
+        resultEl.hidden = true;
+        showStatus('err', 'Not a valid JWT — expected three dot-separated parts.');
+        Taste.toast('Invalid JWT format', 'error');
+        return;
+      }
+
+      var headerStr, payloadStr, payloadObj;
+      try {
+        headerStr  = pretty(b64urlDecode(parts[0]));
+        payloadStr = pretty(b64urlDecode(parts[1]));
+        payloadObj = JSON.parse(payloadStr);
+      } catch (err) {
+        resultEl.hidden = true;
+        showStatus('err', 'Could not decode token: ' + err.message);
+        Taste.toast('Decode failed', 'error');
+        return;
+      }
+
+      headerEl.textContent = headerStr;
+      payloadEl.textContent = payloadStr;
+      sigEl.textContent = parts[2] || '(no signature part)';
+      decoded.header = headerStr;
+      decoded.payload = payloadStr;
+
+      renderClaims(payloadObj);
+      evaluateValidity(payloadObj);
+      resultEl.hidden = false;
+    }
+
+    /* ---- actions ---- */
+    var actions = {
+      decode: decode,
+      sample: function () {
+        // A well-known sample token (HS256). Signature is illustrative only.
+        input.value = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.' +
+          'eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFyc2h2aXIiLCJpYXQiOjE1MTYyMzkwMjIsImV4cCI6MTkwMDAwMDAwMH0.' +
+          'SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c';
+        decode(); save();
+      },
+      clear: function () { input.value=''; resultEl.hidden=true; statusEl.hidden=true; Taste.store.remove(SAVE_KEY); }
+    };
+    Taste.on(root, 'click', '[data-act]', function (e, node) {
+      var fn = actions[node.dataset.act]; if (fn) fn();
+    });
+
+    // Per-section copy
+    Taste.on(root, 'click', '[data-copy]', function (e, node) {
+      e.preventDefault();
+      Taste.copy(decoded[node.dataset.copy] || '');
+    });
+
+    /* ---- autosave / restore / dnd ---- */
+    var save = Taste.debounce(function () { Taste.store.set(SAVE_KEY, input.value); }, 400);
+    Taste.on(input, 'input', save);
+    Taste.dropzone(input, function (t) { input.value = t.trim(); save(); decode(); });
+
+    var saved = Taste.store.get(SAVE_KEY, '');
+    if (saved) { input.value = saved; decode(); }
+
+    Taste.on(input, 'keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); decode(); }
+    });
+
+    input.focus();
+  };
+</script>
