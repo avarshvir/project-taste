@@ -1,0 +1,366 @@
+/* =========================================================================
+   Project Taste — style.css
+   The LAYOUT skeleton. Positions the navbar, sidebar, content area, and
+   footer using tokens from theme.css. Structure & responsiveness only —
+   component skins (buttons, cards, inputs) live in components.css.
+
+   Layout map (desktop):
+     ┌───────────────────────────────────────────────┐
+     │  NAVBAR  (fixed, frosted, full width)           │  --navbar-h
+     ├────────────┬──────────────────────────────────┤
+     │ SIDEBAR    │  CONTENT (scrolls independently)   │
+     │ (sticky)   │                                    │
+     │ --sidebar-w│                                    │
+     ├────────────┴──────────────────────────────────┤
+     │  FOOTER                                         │
+     └───────────────────────────────────────────────┘
+   ========================================================================= */
+
+/* ==========================================================================
+   1. NAVBAR — fixed, frosted glass, full width
+   ========================================================================== */
+.app-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--navbar-h);
+  z-index: var(--z-navbar);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-5);
+  background: var(--navbar-bg);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-bottom: 1px solid var(--border);
+  transition: background-color var(--dur-slow) var(--ease),
+              border-color var(--dur-slow) var(--ease);
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-shrink: 0;
+}
+
+/* Brand / logo */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-lg);
+  color: var(--text);
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.brand:hover { color: var(--text); }
+.brand-mark { font-size: 1.35rem; line-height: 1; }
+.brand-accent { color: var(--accent); }
+
+/* Global search sits in the center, flexes to fill */
+.navbar-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  max-width: 440px;
+  margin: 0 auto;
+}
+.navbar-search .bi-search {
+  position: absolute;
+  left: var(--sp-3);
+  color: var(--text-subtle);
+  font-size: var(--fs-md);
+  pointer-events: none;
+}
+.navbar-search input {
+  width: 100%;
+  height: 38px;
+  padding: 0 var(--sp-3) 0 2.25rem;
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--dur-base) var(--ease),
+              background-color var(--dur-base) var(--ease),
+              box-shadow var(--dur-base) var(--ease);
+}
+.navbar-search input::placeholder { color: var(--text-subtle); }
+.navbar-search input:focus {
+  outline: none;
+  background: var(--surface);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.search-kbd {
+  position: absolute;
+  right: var(--sp-2);
+  pointer-events: none;
+}
+.navbar-search input:focus ~ .search-kbd { opacity: 0; }
+
+/* Right-hand nav actions */
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex-shrink: 0;
+}
+
+/* ==========================================================================
+   2. APP SHELL — sidebar + content row, offset below the fixed navbar
+   ========================================================================== */
+.app-shell {
+  display: flex;
+  align-items: flex-start;
+  padding-top: var(--navbar-h);
+  min-height: 100vh;
+}
+
+/* ==========================================================================
+   3. SIDEBAR — sticky, scrolls internally, collapses to a drawer on mobile
+   ========================================================================== */
+.sidebar {
+  flex: 0 0 var(--sidebar-w);
+  width: var(--sidebar-w);
+  position: sticky;
+  top: var(--navbar-h);
+  height: calc(100vh - var(--navbar-h));
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  transition: transform var(--dur-base) var(--ease),
+              background-color var(--dur-slow) var(--ease),
+              border-color var(--dur-slow) var(--ease);
+}
+
+.sidebar-inner {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--sp-4) var(--sp-3) var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+/* Sidebar filter box */
+.sidebar-filter {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.sidebar-filter .bi-funnel {
+  position: absolute;
+  left: var(--sp-3);
+  color: var(--text-subtle);
+  font-size: var(--fs-sm);
+  pointer-events: none;
+}
+.sidebar-filter input {
+  width: 100%;
+  height: 34px;
+  padding: 0 var(--sp-2) 0 2rem;
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: border-color var(--dur-base) var(--ease);
+}
+.sidebar-filter input::placeholder { color: var(--text-subtle); }
+.sidebar-filter input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+/* Nav groups (categories) */
+.tool-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.nav-group { display: flex; flex-direction: column; gap: var(--sp-1); }
+.nav-group-title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-1);
+  padding: 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+.nav-group-title .bi { font-size: var(--fs-sm); }
+
+.nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ==========================================================================
+   4. CONTENT — independent scroll region, centered column
+   ========================================================================== */
+.content {
+  flex: 1 1 auto;
+  min-width: 0;                /* allow children to shrink / wrap */
+  min-height: calc(100vh - var(--navbar-h));
+  padding: var(--sp-6) var(--sp-6) var(--sp-8);
+}
+
+.view {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  animation: view-in var(--dur-slow) var(--ease-out);
+}
+
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- Dashboard hero ---- */
+.dashboard-hero {
+  text-align: center;
+  padding: var(--sp-7) var(--sp-4) var(--sp-6);
+}
+.hero-title {
+  font-size: var(--fs-3xl);
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.03em;
+  margin-bottom: var(--sp-3);
+}
+.hero-accent { color: var(--accent); }
+.hero-subtitle {
+  font-size: var(--fs-lg);
+  color: var(--text-muted);
+  max-width: 640px;
+  margin: 0 auto var(--sp-5);
+}
+.hero-actions {
+  display: flex;
+  gap: var(--sp-3);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ---- Tool grid (dashboard cards) ---- */
+.tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--sp-4);
+  margin-top: var(--sp-6);
+}
+
+/* ==========================================================================
+   5. FOOTER — full width, sits below the shell
+   ========================================================================== */
+.app-footer {
+  border-top: 1px solid var(--border);
+  background: var(--sidebar-bg);
+  padding: var(--sp-5) var(--sp-6);
+  text-align: center;
+  transition: background-color var(--dur-slow) var(--ease),
+              border-color var(--dur-slow) var(--ease);
+}
+.footer-text {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-base);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.footer-heart { color: var(--danger); animation: heart-beat 1.6s var(--ease) infinite; }
+@keyframes heart-beat {
+  0%, 100% { transform: scale(1); }
+  15%      { transform: scale(1.25); }
+  30%      { transform: scale(1); }
+}
+.footer-sub { margin: 0; font-size: var(--fs-sm); color: var(--text-subtle); }
+.footer-sub a { color: var(--text-muted); }
+.footer-sub a:hover { color: var(--accent); }
+
+/* ==========================================================================
+   6. MOBILE DRAWER — backdrop + off-canvas sidebar
+   ========================================================================== */
+.sidebar-backdrop {
+  position: fixed;
+  inset: var(--navbar-h) 0 0 0;
+  z-index: var(--z-backdrop);
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+  animation: fade-in var(--dur-base) var(--ease) forwards;
+}
+@keyframes fade-in { to { opacity: 1; } }
+
+/* The sidebar toggle button is hidden on desktop */
+.sidebar-toggle { display: none; }
+
+/* ==========================================================================
+   7. RESPONSIVE
+   ========================================================================== */
+
+/* Tablet: slightly narrower sidebar */
+@media (max-width: 1024px) {
+  :root { --sidebar-w: 248px; }
+  .content { padding: var(--sp-5) var(--sp-5) var(--sp-7); }
+}
+
+/* Mobile: sidebar becomes an off-canvas drawer */
+@media (max-width: 768px) {
+  .sidebar-toggle { display: inline-flex; }
+
+  .app-navbar { padding: 0 var(--sp-3); gap: var(--sp-2); }
+
+  /* Hide text labels on nav buttons to save space */
+  .nav-label { display: none; }
+
+  /* Search collapses below the search-max but stays usable */
+  .navbar-search { max-width: none; }
+  .search-kbd { display: none; }
+
+  .sidebar {
+    position: fixed;
+    top: var(--navbar-h);
+    left: 0;
+    z-index: var(--z-sidebar);
+    height: calc(100vh - var(--navbar-h));
+    box-shadow: var(--shadow-lg);
+    transform: translateX(-100%);
+  }
+  /* Opened state toggled by sidebar.js */
+  .sidebar.is-open { transform: translateX(0); }
+
+  .content { padding: var(--sp-5) var(--sp-4) var(--sp-7); }
+  .hero-title { font-size: var(--fs-2xl); }
+  .hero-subtitle { font-size: var(--fs-md); }
+}
+
+/* Small phones: tighten the brand text */
+@media (max-width: 420px) {
+  .brand-text { display: none; }         /* keep just the 🍋 mark */
+  .tool-grid { grid-template-columns: 1fr; }
+}
+
+/* Hide the backdrop entirely on desktop even if left in the DOM */
+@media (min-width: 769px) {
+  .sidebar-backdrop { display: none !important; }
+}

@@ -1,0 +1,548 @@
+/* =========================================================================
+   Project Taste — components.css
+   Skins for every reusable UI piece. Consumes tokens from theme.css and
+   sits on top of the layout defined in style.css.
+
+   Contents:
+     1. Icon buttons + theme toggle
+     2. Nav link buttons (navbar) + sponsor
+     3. Sidebar nav items + badges
+     4. Buttons (.btn-taste variants)
+     5. Tool cards (dashboard grid)
+     6. Form controls (input, textarea, select)
+     7. Tool page scaffold (card, info-box, toolbar)
+     8. Toast
+     9. Accent switcher swatches
+    10. Coming-soon / empty states
+   ========================================================================= */
+
+/* ==========================================================================
+   1. ICON BUTTONS + THEME TOGGLE
+   ========================================================================== */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-size: var(--fs-lg);
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease);
+}
+.icon-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.icon-btn:active { transform: translateY(1px); }
+
+/* Theme toggle: show one icon depending on active theme */
+.theme-toggle .theme-icon-light,
+.theme-toggle .theme-icon-dark {
+  transition: opacity var(--dur-base) var(--ease),
+              transform var(--dur-base) var(--ease);
+}
+[data-theme="light"] .theme-toggle .theme-icon-dark,
+[data-theme="dark"]  .theme-toggle .theme-icon-light {
+  display: none;
+}
+.theme-toggle:hover { color: var(--accent); }
+
+/* ==========================================================================
+   2. NAVBAR LINK BUTTONS
+   ========================================================================== */
+.nav-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 38px;
+  padding: 0 var(--sp-3);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease);
+}
+.nav-link-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.nav-link-btn .bi { font-size: var(--fs-md); }
+
+/* Sponsor button — subtle accent-tinted call to action */
+.sponsor-btn {
+  color: var(--danger);
+  background: var(--badge-hot-bg);
+}
+.sponsor-btn:hover {
+  color: #fff;
+  background: var(--danger);
+}
+.sponsor-btn .bi-heart-fill { animation: heart-beat 1.6s var(--ease) infinite; }
+
+/* ==========================================================================
+   3. SIDEBAR NAV ITEMS + BADGES
+   ========================================================================== */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-2);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  position: relative;
+  transition: background-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease);
+}
+.nav-item .bi {
+  font-size: var(--fs-md);
+  color: var(--text-subtle);
+  flex-shrink: 0;
+  transition: color var(--dur-fast) var(--ease);
+}
+.nav-item span.nav-item-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nav-item:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.nav-item:hover .bi { color: var(--text-muted); }
+
+/* Active tool */
+.nav-item.active {
+  color: var(--accent);
+  background: var(--accent-tint);
+  font-weight: var(--fw-semibold);
+}
+.nav-item.active .bi { color: var(--accent); }
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: -var(--sp-3);
+  left: calc(-1 * var(--sp-3));
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+
+/* Favorite star toggle inside a nav item */
+.nav-item-fav {
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  color: var(--text-subtle);
+  opacity: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: opacity var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease);
+}
+.nav-item:hover .nav-item-fav { opacity: 1; }
+.nav-item-fav:hover { color: var(--warning); }
+.nav-item-fav.is-fav { opacity: 1; color: var(--warning); }
+
+/* ---- Badges ---- */
+.badge-taste {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25em;
+  padding: 0.1em 0.5em;
+  font-size: 0.625rem;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: var(--radius-full);
+  line-height: 1.4;
+}
+.badge-new   { background: var(--badge-new-bg);   color: var(--badge-new-text); }
+.badge-hot   { background: var(--badge-hot-bg);   color: var(--badge-hot-text); }
+.badge-niche { background: var(--badge-niche-bg); color: var(--badge-niche-text); }
+
+/* ==========================================================================
+   4. BUTTONS — .btn-taste variants
+   ========================================================================== */
+.btn-taste {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  line-height: 1;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease),
+              transform var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease);
+}
+.btn-taste:active { transform: translateY(1px); }
+.btn-taste .bi { font-size: var(--fs-md); }
+.btn-taste kbd { margin: 0 0.1em; }
+
+/* Primary — accent filled */
+.btn-taste-primary {
+  color: #fff;
+  background: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+.btn-taste-primary:hover {
+  background: var(--accent-strong);
+  box-shadow: var(--shadow-md);
+}
+
+/* Secondary — neutral surface */
+.btn-taste-secondary {
+  color: var(--text);
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+.btn-taste-secondary:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-strong);
+}
+
+/* Ghost — transparent, for the palette CTA */
+.btn-taste-ghost {
+  color: var(--text-muted);
+  background: transparent;
+  border-color: var(--border);
+}
+.btn-taste-ghost:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+
+/* Success — copy actions */
+.btn-taste-success {
+  color: #fff;
+  background: var(--success);
+}
+.btn-taste-success:hover { filter: brightness(0.95); box-shadow: var(--shadow-md); }
+
+/* Danger — destructive actions */
+.btn-taste-danger {
+  color: #fff;
+  background: var(--danger);
+}
+.btn-taste-danger:hover { filter: brightness(0.95); }
+
+/* Small size modifier */
+.btn-taste-sm { padding: var(--sp-1) var(--sp-3); font-size: var(--fs-sm); }
+
+.btn-taste:disabled,
+.btn-taste[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   5. TOOL CARDS — dashboard grid
+   ========================================================================== */
+.tool-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  color: var(--text);
+  position: relative;
+  overflow: hidden;
+  transition: transform var(--dur-base) var(--ease-out),
+              box-shadow var(--dur-base) var(--ease),
+              border-color var(--dur-base) var(--ease);
+}
+/* Accent wash that fades in on hover */
+.tool-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--accent-tint), transparent 60%);
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease);
+  pointer-events: none;
+}
+.tool-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--accent);
+  color: var(--text);
+}
+.tool-card:hover::after { opacity: 1; }
+
+.tool-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  font-size: var(--fs-xl);
+  color: var(--accent);
+  background: var(--accent-tint);
+  border-radius: var(--radius-md);
+}
+.tool-card-title {
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-md);
+}
+.tool-card-desc {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: var(--lh-base);
+}
+/* Badge row inside a card */
+.tool-card-badges {
+  display: flex;
+  gap: var(--sp-1);
+  position: absolute;
+  top: var(--sp-3);
+  right: var(--sp-3);
+}
+
+/* ==========================================================================
+   6. FORM CONTROLS
+   ========================================================================== */
+.field-label {
+  display: block;
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  margin-bottom: var(--sp-2);
+}
+
+.input-taste,
+.textarea-taste,
+.select-taste {
+  width: 100%;
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--sp-3);
+  transition: border-color var(--dur-base) var(--ease),
+              box-shadow var(--dur-base) var(--ease),
+              background-color var(--dur-base) var(--ease);
+}
+.input-taste { height: 42px; padding-top: 0; padding-bottom: 0; }
+.textarea-taste {
+  min-height: 200px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+}
+.input-taste::placeholder,
+.textarea-taste::placeholder { color: var(--text-subtle); }
+
+.input-taste:focus,
+.textarea-taste:focus,
+.select-taste:focus {
+  outline: none;
+  background: var(--surface);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.textarea-taste[readonly] {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+
+/* Drag-and-drop highlight (toggled by JS with .is-dragover) */
+.textarea-taste.is-dragover,
+.dropzone.is-dragover {
+  border-color: var(--accent);
+  border-style: dashed;
+  background: var(--accent-tint);
+}
+
+/* ==========================================================================
+   7. TOOL PAGE SCAFFOLD
+   ========================================================================== */
+.tool-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+}
+.tool-header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  font-size: var(--fs-xl);
+  color: var(--accent);
+  background: var(--accent-tint);
+  border-radius: var(--radius-md);
+  flex-shrink: 0;
+}
+.tool-header-text h1 {
+  font-size: var(--fs-2xl);
+  letter-spacing: -0.02em;
+  margin-bottom: 0.15em;
+}
+.tool-header-text p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-base);
+}
+
+.tool-card-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-5);
+}
+
+.info-box {
+  background: var(--accent-tint);
+  border-left: 3px solid var(--accent);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  margin-bottom: var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.info-box ul { margin: var(--sp-2) 0 0; padding-left: var(--sp-5); }
+.info-box code { font-size: 0.85em; }
+
+.toolbar {
+  display: flex;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+  margin: var(--sp-3) 0;
+}
+
+/* ==========================================================================
+   8. TOAST
+   ========================================================================== */
+.toast-taste {
+  position: fixed;
+  bottom: var(--sp-5);
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  z-index: var(--z-toast);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 90vw;
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-inverse);
+  background: var(--text);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-base) var(--ease),
+              transform var(--dur-base) var(--ease-out);
+}
+.toast-taste.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.toast-taste .bi { font-size: var(--fs-md); }
+.toast-taste.toast-success { background: var(--success); color: #fff; }
+.toast-taste.toast-error   { background: var(--danger);  color: #fff; }
+
+/* ==========================================================================
+   9. ACCENT SWITCHER SWATCHES
+   ========================================================================== */
+.accent-switcher {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.accent-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease);
+}
+.accent-swatch:hover { transform: scale(1.15); }
+.accent-swatch.is-active { border-color: var(--text); }
+.accent-swatch[data-swatch="sky"]     { background: var(--accent-sky-600); }
+.accent-swatch[data-swatch="violet"]  { background: var(--accent-violet-600); }
+.accent-swatch[data-swatch="emerald"] { background: var(--accent-emerald-600); }
+.accent-swatch[data-swatch="rose"]    { background: var(--accent-rose-600); }
+.accent-swatch[data-swatch="amber"]   { background: var(--accent-amber-600); }
+
+/* ==========================================================================
+   10. COMING-SOON / EMPTY STATES
+   ========================================================================== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: var(--sp-3);
+  padding: var(--sp-8) var(--sp-4);
+  color: var(--text-muted);
+}
+.empty-state .bi {
+  font-size: 3rem;
+  color: var(--text-subtle);
+  opacity: 0.6;
+}
+.empty-state h2 { font-size: var(--fs-xl); color: var(--text); }
+.empty-state p { max-width: 420px; margin: 0; }
+
+/* "Coming soon" ribbon on soon-status cards */
+.tool-card.is-soon { opacity: 0.72; }
+.tool-card.is-soon .tool-card-icon { color: var(--text-subtle); background: var(--bg-subtle); }
+.soon-tag {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-subtle);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-full);
+  padding: 0.05em 0.55em;
+  align-self: flex-start;
+}
+
+/* No-results row for search/filter */
+.no-results {
+  padding: var(--sp-4);
+  text-align: center;
+  color: var(--text-subtle);
+  font-size: var(--fs-sm);
+}

@@ -1,0 +1,281 @@
+/* =========================================================================
+   Project Taste — tools.css
+   Shared, reusable UI primitives used INSIDE tool pages. Styling these once
+   means every tool (present and future) inherits a consistent premium look.
+
+   Consumes tokens from theme.css. Load after components.css.
+
+   Contents:
+     1. Field wrapper + label hints
+     2. Segmented control (mode switch)
+     3. Inline checkboxes / radios
+     4. Dropzone (file upload area)
+     5. File preview (image + metadata)
+     6. Split / two-column tool layout (input | output)
+     7. Small helpers (code output, stat chips, copy-inline)
+   ========================================================================= */
+
+/* ==========================================================================
+   1. FIELD WRAPPER + LABEL HINTS
+   ========================================================================== */
+.field { margin-bottom: var(--sp-4); }
+.field:last-child { margin-bottom: 0; }
+
+.field-hint {
+  font-weight: var(--fw-regular);
+  font-size: var(--fs-xs);
+  color: var(--text-subtle);
+  margin-left: var(--sp-2);
+}
+
+/* ==========================================================================
+   2. SEGMENTED CONTROL — tabbed mode switch (e.g. Text / File)
+   ========================================================================== */
+.seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: var(--sp-4);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.seg-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease);
+}
+.seg-btn:hover { color: var(--text); }
+.seg-btn.is-active {
+  color: var(--accent);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+}
+.seg-btn .bi { font-size: var(--fs-md); }
+
+/* ==========================================================================
+   3. INLINE CHECKBOXES / RADIOS
+   Compact toggles that sit in a .toolbar next to buttons.
+   ========================================================================== */
+.check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease);
+}
+.check-inline:hover { color: var(--text); border-color: var(--border-strong); }
+.check-inline input {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   4. DROPZONE — file upload area
+   ========================================================================== */
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  text-align: center;
+  padding: var(--sp-6) var(--sp-4);
+  margin-bottom: var(--sp-4);
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 2px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: border-color var(--dur-base) var(--ease),
+              background-color var(--dur-base) var(--ease),
+              color var(--dur-base) var(--ease);
+}
+.dropzone:hover {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--surface-hover);
+}
+.dropzone.is-dragover {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+.dropzone .bi {
+  font-size: 2rem;
+  color: var(--text-subtle);
+  transition: color var(--dur-base) var(--ease);
+}
+.dropzone:hover .bi,
+.dropzone.is-dragover .bi { color: var(--accent); }
+.dropzone-title { font-size: var(--fs-md); font-weight: var(--fw-semibold); color: var(--text); }
+.dropzone-sub   { font-size: var(--fs-sm); color: var(--text-subtle); }
+
+/* ==========================================================================
+   5. FILE PREVIEW — image thumbnail + metadata
+   ========================================================================== */
+.file-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-3);
+  margin-bottom: var(--sp-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.file-preview img {
+  max-width: 96px;
+  max-height: 96px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  object-fit: contain;
+  background:
+    linear-gradient(45deg, var(--bg-subtle) 25%, transparent 25%) 0 0/16px 16px,
+    linear-gradient(-45deg, var(--bg-subtle) 25%, transparent 25%) 0 0/16px 16px;
+}
+.file-preview img:not([src]) { display: none; }
+.file-preview-meta {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: var(--lh-base);
+  word-break: break-word;
+}
+.file-preview-meta strong { color: var(--text); }
+
+/* ==========================================================================
+   6. SPLIT LAYOUT — side-by-side input | output (used by many tools)
+   Add class="tool-split" to a wrapper containing two .field blocks.
+   Collapses to stacked on narrow content.
+   ========================================================================== */
+.tool-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+  align-items: start;
+}
+.tool-split .field { margin-bottom: 0; }
+@media (max-width: 720px) {
+  .tool-split { grid-template-columns: 1fr; }
+}
+
+/* Center arrow between two panes (optional) */
+.tool-split-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-subtle);
+  font-size: var(--fs-xl);
+}
+
+/* ==========================================================================
+   7. SMALL HELPERS
+   ========================================================================== */
+
+/* Read-only code / result block (non-editable alternative to textarea) */
+.code-output {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+  color: var(--code-text);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--sp-3);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: auto;
+  max-height: 420px;
+}
+
+/* Stat chips — e.g. "12 lines · 340 chars · 1.2 KB" */
+.stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin: var(--sp-3) 0;
+}
+.stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+}
+.stat-chip strong { color: var(--text); }
+.stat-chip .bi { color: var(--accent); font-size: var(--fs-sm); }
+
+/* Inline copy button (e.g. next to a generated value) */
+.copy-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+}
+.copy-inline:hover { color: var(--accent); border-color: var(--accent); }
+
+/* A row that pairs an input with a trailing action (input + copy button) */
+.input-row {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+.input-row .input-taste { flex: 1 1 auto; }
+
+/* Result value list (generators: UUID, password, etc.) */
+.result-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.result-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.result-list li span { flex: 1 1 auto; word-break: break-all; }

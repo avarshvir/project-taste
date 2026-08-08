@@ -1,0 +1,359 @@
+/* =========================================================================
+   Project Taste — theme.css
+   The single design-token layer. Every color, shadow, radius, space, and
+   type value lives here as a CSS custom property. All other stylesheets
+   consume these tokens — never hardcode raw values elsewhere.
+
+   Structure:
+     1. Accent palettes (drives the 🎨 accent switcher)
+     2. Global tokens (radius, spacing, type, transitions, z-index)
+     3. Light theme  [data-theme="light"]
+     4. Dark theme   [data-theme="dark"]
+     5. Accent overrides ([data-accent="…"])
+     6. Base element + selection styling
+   ========================================================================= */
+
+:root {
+  /* ---------------------------------------------------------------------
+     1. ACCENT PALETTES
+     Each accent exposes three stops. The active accent is copied into
+     --accent / --accent-strong / --accent-soft in section 5.
+     Default accent = sky.
+     --------------------------------------------------------------------- */
+  --accent-sky-500:     #0ea5e9;
+  --accent-sky-600:     #0284c7;
+  --accent-sky-700:     #0369a1;
+
+  --accent-violet-500:  #8b5cf6;
+  --accent-violet-600:  #7c3aed;
+  --accent-violet-700:  #6d28d9;
+
+  --accent-emerald-500: #10b981;
+  --accent-emerald-600: #059669;
+  --accent-emerald-700: #047857;
+
+  --accent-rose-500:    #f43f5e;
+  --accent-rose-600:    #e11d48;
+  --accent-rose-700:    #be123c;
+
+  --accent-amber-500:   #f59e0b;
+  --accent-amber-600:   #d97706;
+  --accent-amber-700:   #b45309;
+
+  /* Active accent (defaults; overridden per [data-accent]) */
+  --accent:        var(--accent-sky-600);
+  --accent-strong: var(--accent-sky-700);
+  --accent-soft:   var(--accent-sky-500);
+  /* Translucent accent tints used for focus rings, hover washes, badges */
+  --accent-rgb:    2, 132, 199;             /* keep in sync with --accent */
+  --accent-tint:   rgba(var(--accent-rgb), 0.10);
+  --accent-tint-2: rgba(var(--accent-rgb), 0.16);
+  --accent-ring:   rgba(var(--accent-rgb), 0.35);
+
+  /* ---------------------------------------------------------------------
+     2. GLOBAL TOKENS (theme-independent)
+     --------------------------------------------------------------------- */
+
+  /* Typography */
+  --font-ui:   'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Courier New', monospace;
+
+  --fs-xs:   0.75rem;    /* 12 */
+  --fs-sm:   0.8125rem;  /* 13 */
+  --fs-base: 0.9375rem;  /* 15 */
+  --fs-md:   1rem;       /* 16 */
+  --fs-lg:   1.125rem;   /* 18 */
+  --fs-xl:   1.375rem;   /* 22 */
+  --fs-2xl:  1.75rem;    /* 28 */
+  --fs-3xl:  2.5rem;     /* 40 */
+
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+
+  --lh-tight: 1.25;
+  --lh-base:  1.6;
+
+  /* Spacing scale (4px base) */
+  --sp-1:  0.25rem;
+  --sp-2:  0.5rem;
+  --sp-3:  0.75rem;
+  --sp-4:  1rem;
+  --sp-5:  1.5rem;
+  --sp-6:  2rem;
+  --sp-7:  2.5rem;
+  --sp-8:  3rem;
+
+  /* Radii — soft, modern, SaaS-grade */
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-xl:   20px;
+  --radius-full: 999px;
+
+  /* Layout metrics */
+  --navbar-h:    60px;
+  --sidebar-w:   280px;
+  --content-max: 1080px;
+
+  /* Motion */
+  --ease:        cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast:    120ms;
+  --dur-base:    200ms;
+  --dur-slow:    320ms;
+  --transition:  var(--dur-base) var(--ease);
+
+  /* Z-index layers */
+  --z-sidebar:   40;
+  --z-navbar:    50;
+  --z-backdrop:  45;
+  --z-palette:   80;
+  --z-toast:     90;
+}
+
+/* ==========================================================================
+   3. LIGHT THEME
+   Warm-neutral surfaces, soft shadows, restrained contrast — premium & calm.
+   ========================================================================== */
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg:            #f7f8fa;   /* app background */
+  --bg-subtle:     #eef1f5;   /* subtle inset areas */
+  --surface:       #ffffff;   /* cards, panels */
+  --surface-2:     #fbfcfe;   /* nested surface */
+  --surface-hover: #f1f4f8;   /* hover wash */
+  --navbar-bg:     rgba(255, 255, 255, 0.80);
+  --sidebar-bg:    #ffffff;
+
+  /* Text */
+  --text:          #1e2430;   /* primary */
+  --text-muted:    #5b6472;   /* secondary */
+  --text-subtle:   #8a93a3;   /* tertiary / placeholders */
+  --text-inverse:  #ffffff;
+
+  /* Borders & dividers */
+  --border:        #e3e8ef;
+  --border-strong: #cbd3df;
+
+  /* Code blocks */
+  --code-bg:       #f3f5f9;
+  --code-text:     #0f3f5c;
+
+  /* Shadows — layered, low-opacity for that soft premium lift */
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.07), 0 2px 4px rgba(16, 24, 40, 0.04);
+  --shadow-lg: 0 12px 28px rgba(16, 24, 40, 0.10), 0 4px 10px rgba(16, 24, 40, 0.05);
+  --shadow-glow: 0 0 0 4px var(--accent-ring);
+
+  /* Semantic status colors */
+  --success: #059669;
+  --danger:  #dc2626;
+  --warning: #d97706;
+  --info:    #0284c7;
+
+  /* Badge backgrounds */
+  --badge-new-bg:     rgba(5, 150, 105, 0.12);
+  --badge-new-text:   #047857;
+  --badge-hot-bg:     rgba(217, 119, 6, 0.14);
+  --badge-hot-text:   #b45309;
+  --badge-niche-bg:   rgba(124, 58, 237, 0.12);
+  --badge-niche-text: #6d28d9;
+}
+
+/* ==========================================================================
+   4. DARK THEME
+   Deep slate (not pure black) with elevated surfaces and glowy accents.
+   ========================================================================== */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --bg:            #0d1117;   /* app background */
+  --bg-subtle:     #10151d;
+  --surface:       #161b22;   /* cards, panels */
+  --surface-2:     #1c232d;   /* nested surface */
+  --surface-hover: #202834;   /* hover wash */
+  --navbar-bg:     rgba(13, 17, 23, 0.75);
+  --sidebar-bg:    #10151d;
+
+  /* Text */
+  --text:          #e6edf3;
+  --text-muted:    #a9b4c0;
+  --text-subtle:   #6e7b8a;
+  --text-inverse:  #0d1117;
+
+  /* Borders & dividers */
+  --border:        #262d38;
+  --border-strong: #363f4d;
+
+  /* Code blocks */
+  --code-bg:       #0b0f14;
+  --code-text:     #7ee2ff;
+
+  /* Shadows — deeper, since surfaces are dark */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.40), 0 1px 2px rgba(0, 0, 0, 0.30);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.30);
+  --shadow-lg: 0 14px 34px rgba(0, 0, 0, 0.55), 0 6px 14px rgba(0, 0, 0, 0.35);
+  --shadow-glow: 0 0 0 4px var(--accent-ring);
+
+  /* Semantic status colors (brightened for dark bg) */
+  --success: #34d399;
+  --danger:  #f87171;
+  --warning: #fbbf24;
+  --info:    #38bdf8;
+
+  /* Badge backgrounds */
+  --badge-new-bg:     rgba(52, 211, 153, 0.16);
+  --badge-new-text:   #6ee7b7;
+  --badge-hot-bg:     rgba(251, 191, 36, 0.16);
+  --badge-hot-text:   #fcd34d;
+  --badge-niche-bg:   rgba(167, 139, 250, 0.18);
+  --badge-niche-text: #c4b5fd;
+}
+
+/* ==========================================================================
+   5. ACCENT OVERRIDES
+   Set on <html data-accent="violet"> etc. by the accent switcher.
+   Sky is the default (no attribute needed) but declared for completeness.
+   ========================================================================== */
+[data-accent="sky"] {
+  --accent: var(--accent-sky-600);  --accent-strong: var(--accent-sky-700);  --accent-soft: var(--accent-sky-500);
+  --accent-rgb: 2, 132, 199;
+}
+[data-accent="violet"] {
+  --accent: var(--accent-violet-600);  --accent-strong: var(--accent-violet-700);  --accent-soft: var(--accent-violet-500);
+  --accent-rgb: 124, 58, 237;
+}
+[data-accent="emerald"] {
+  --accent: var(--accent-emerald-600);  --accent-strong: var(--accent-emerald-700);  --accent-soft: var(--accent-emerald-500);
+  --accent-rgb: 5, 150, 105;
+}
+[data-accent="rose"] {
+  --accent: var(--accent-rose-600);  --accent-strong: var(--accent-rose-700);  --accent-soft: var(--accent-rose-500);
+  --accent-rgb: 225, 29, 72;
+}
+[data-accent="amber"] {
+  --accent: var(--accent-amber-600);  --accent-strong: var(--accent-amber-700);  --accent-soft: var(--accent-amber-500);
+  --accent-rgb: 217, 119, 6;
+}
+
+/* Recompute accent tints whenever --accent-rgb changes */
+[data-accent] {
+  --accent-tint:   rgba(var(--accent-rgb), 0.10);
+  --accent-tint-2: rgba(var(--accent-rgb), 0.16);
+  --accent-ring:   rgba(var(--accent-rgb), 0.35);
+}
+
+/* ==========================================================================
+   6. BASE ELEMENTS
+   Minimal resets that consume the tokens. Layout lives in style.css.
+   ========================================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-base);
+  color: var(--text);
+  background-color: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Smooth cross-fade when toggling theme/accent */
+  transition: background-color var(--dur-slow) var(--ease),
+              color var(--dur-slow) var(--ease);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-tight);
+  color: var(--text);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease);
+}
+a:hover { color: var(--accent-strong); }
+
+code, pre, kbd, samp {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+code {
+  background: var(--code-bg);
+  color: var(--code-text);
+  padding: 0.12em 0.4em;
+  border-radius: var(--radius-xs);
+}
+
+kbd {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.45em;
+  line-height: 1;
+}
+
+/* Accessible focus ring for keyboard users */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-glow);
+  border-radius: var(--radius-sm);
+}
+
+/* Text selection uses the accent tint */
+::selection {
+  background: var(--accent-tint-2);
+  color: var(--text);
+}
+
+/* ---- Custom scrollbars (WebKit + Firefox) ---- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar        { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track  { background: transparent; }
+*::-webkit-scrollbar-thumb  {
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--bg);
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--text-subtle); }
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
