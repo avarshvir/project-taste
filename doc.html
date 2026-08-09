@@ -3,92 +3,433 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Project Taste documentation — what every developer tool does, how to use it, features, and keyboard shortcuts." />
+  <meta name="description" content="Detailed Project Taste documentation, including app purpose, workflow, privacy model, tool categories, and usage notes for every tool." />
   <meta name="theme-color" content="#0284c7" />
-  <title>Documentation — Project Taste</title>
+  <title>Documentation - Project Taste</title>
 
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍋</text></svg>" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='18' fill='%230284c7'/%3E%3Ctext x='50' y='61' text-anchor='middle' font-size='38' font-family='Arial' font-weight='700' fill='white'%3EPT%3C/text%3E%3C/svg%3E" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet" />
 
-  <!-- Shared Project Taste styles -->
   <link rel="stylesheet" href="assets/css/theme.css" />
   <link rel="stylesheet" href="assets/css/style.css" />
   <link rel="stylesheet" href="assets/css/components.css" />
   <link rel="stylesheet" href="assets/css/tools.css" />
 
-  <!-- No-flash theme (same approach as index.html) -->
   <script>
     (function () {
       try {
-        var saved = localStorage.getItem('taste:theme');
-        var accent = localStorage.getItem('taste:accent');
-        var system = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', (saved && JSON.parse(saved)) || system);
-        if (accent) document.documentElement.setAttribute('data-accent', JSON.parse(accent));
+        var savedTheme = localStorage.getItem('taste:theme');
+        var savedAccent = localStorage.getItem('taste:accent');
+        var systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme ? JSON.parse(savedTheme) : systemTheme);
+        if (savedAccent) document.documentElement.setAttribute('data-accent', JSON.parse(savedAccent));
       } catch (e) {}
     })();
   </script>
 
   <style>
-    /* ---- Doc-page-specific layout (reuses tokens) ---- */
-    .doc-wrap { display: flex; gap: var(--sp-6); max-width: 1200px; margin: 0 auto; padding: var(--sp-6) var(--sp-5) var(--sp-8); align-items: flex-start; }
-    .doc-toc { position: sticky; top: calc(var(--navbar-h) + var(--sp-5)); flex: 0 0 230px; max-height: calc(100vh - var(--navbar-h) - var(--sp-6)); overflow-y: auto; }
-    .doc-toc h3 { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em; color: var(--text-subtle); margin-bottom: var(--sp-2); }
-    .doc-toc a { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-2); border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--text-muted); }
-    .doc-toc a:hover { background: var(--surface-hover); color: var(--text); }
-    .doc-toc a .count { margin-left: auto; font-size: var(--fs-xs); color: var(--text-subtle); }
-    .doc-main { flex: 1 1 auto; min-width: 0; }
+    .doc-shell {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--sp-6);
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: calc(var(--navbar-h) + var(--sp-5)) var(--sp-5) var(--sp-8);
+    }
 
-    .doc-hero { text-align: center; padding: var(--sp-6) 0 var(--sp-5); }
-    .doc-hero h1 { font-size: var(--fs-3xl); letter-spacing: -0.03em; margin-bottom: var(--sp-3); }
-    .doc-hero h1 .hero-accent { color: var(--accent); }
-    .doc-hero p { color: var(--text-muted); font-size: var(--fs-lg); max-width: 640px; margin: 0 auto; }
-    .doc-metarow { display: flex; gap: var(--sp-2); justify-content: center; flex-wrap: wrap; margin-top: var(--sp-4); }
+    .doc-toc {
+      position: sticky;
+      top: calc(var(--navbar-h) + var(--sp-4));
+      flex: 0 0 260px;
+      max-height: calc(100vh - var(--navbar-h) - var(--sp-6));
+      overflow-y: auto;
+      padding-right: var(--sp-2);
+    }
 
-    .doc-search { position: relative; max-width: 520px; margin: var(--sp-5) auto; }
-    .doc-search i { position: absolute; left: var(--sp-3); top: 50%; transform: translateY(-50%); color: var(--text-subtle); }
-    .doc-search input { width: 100%; height: 44px; padding: 0 var(--sp-3) 0 2.4rem; font-size: var(--fs-md); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text); }
-    .doc-search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+    .doc-toc-title {
+      margin: 0 0 var(--sp-2);
+      color: var(--text-subtle);
+      font-size: var(--fs-xs);
+      font-weight: var(--fw-semibold);
+      text-transform: uppercase;
+    }
 
-    .doc-cat { margin: var(--sp-7) 0 var(--sp-4); padding-top: var(--sp-3); }
-    .doc-cat-title { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-xl); }
-    .doc-cat-title .bi { color: var(--accent); }
-    .doc-cat-title .count { font-size: var(--fs-sm); color: var(--text-subtle); font-weight: var(--fw-regular); }
+    .doc-toc a {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      min-height: 34px;
+      padding: 0 var(--sp-2);
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
+      font-size: var(--fs-sm);
+    }
 
-    .doc-tool { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-xs); padding: var(--sp-4) var(--sp-5); margin-bottom: var(--sp-4); }
-    .doc-tool-head { display: flex; align-items: flex-start; gap: var(--sp-3); }
-    .doc-tool-icon { flex: 0 0 auto; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; font-size: var(--fs-lg); color: var(--accent); background: var(--accent-tint); border-radius: var(--radius-md); }
-    .doc-tool-headtext { flex: 1 1 auto; min-width: 0; }
-    .doc-tool-headtext h4 { font-size: var(--fs-lg); display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
-    .doc-tool-headtext p { margin: var(--sp-1) 0 0; color: var(--text-muted); font-size: var(--fs-base); }
-    .doc-status { font-size: var(--fs-xs); font-weight: var(--fw-semibold); padding: .1em .6em; border-radius: var(--radius-full); }
-    .doc-status.ready { background: var(--badge-new-bg); color: var(--badge-new-text); }
-    .doc-status.soon  { background: var(--bg-subtle); color: var(--text-subtle); border: 1px dashed var(--border-strong); }
+    .doc-toc a:hover {
+      background: var(--surface-hover);
+      color: var(--text);
+    }
 
-    .doc-detail { margin-top: var(--sp-4); padding-top: var(--sp-4); border-top: 1px dashed var(--border); }
-    .doc-detail h5 { font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: .05em; color: var(--text-subtle); margin: var(--sp-3) 0 var(--sp-2); display: flex; align-items: center; gap: var(--sp-2); }
-    .doc-detail h5 .bi { color: var(--accent); }
-    .doc-detail ul { margin: 0; padding-left: var(--sp-5); }
-    .doc-detail li { margin-bottom: var(--sp-1); color: var(--text); font-size: var(--fs-base); }
-    .doc-detail li code, .doc-detail p code { font-size: .85em; }
-    .doc-open-btn { margin-top: var(--sp-3); }
+    .doc-toc .count {
+      margin-left: auto;
+      color: var(--text-subtle);
+      font-size: var(--fs-xs);
+    }
 
-    .doc-empty { text-align: center; color: var(--text-subtle); padding: var(--sp-8) 0; }
+    .doc-main {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
 
-    @media (max-width: 900px) { .doc-toc { display: none; } .doc-wrap { padding: var(--sp-5) var(--sp-4) var(--sp-7); } }
+    .doc-hero {
+      padding: var(--sp-6) 0 var(--sp-5);
+      text-align: left;
+    }
+
+    .doc-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-2);
+      margin-bottom: var(--sp-3);
+      color: var(--accent);
+      font-size: var(--fs-sm);
+      font-weight: var(--fw-semibold);
+    }
+
+    .doc-hero h1 {
+      max-width: 780px;
+      margin: 0;
+      font-size: var(--fs-3xl);
+      line-height: 1.05;
+    }
+
+    .doc-hero p {
+      max-width: 760px;
+      margin: var(--sp-3) 0 0;
+      color: var(--text-muted);
+      font-size: var(--fs-lg);
+      line-height: 1.65;
+    }
+
+    .doc-metarow,
+    .doc-filter-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--sp-2);
+      margin-top: var(--sp-4);
+    }
+
+    .doc-section {
+      margin: var(--sp-7) 0;
+    }
+
+    .doc-section h2 {
+      margin-bottom: var(--sp-3);
+      font-size: var(--fs-2xl);
+    }
+
+    .doc-section-intro {
+      max-width: 760px;
+      margin: 0 0 var(--sp-4);
+      color: var(--text-muted);
+      line-height: 1.65;
+    }
+
+    .doc-panel-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--sp-3);
+    }
+
+    .doc-panel {
+      min-height: 100%;
+      padding: var(--sp-4);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      box-shadow: var(--shadow-xs);
+    }
+
+    .doc-panel h3 {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      margin: 0 0 var(--sp-2);
+      font-size: var(--fs-md);
+    }
+
+    .doc-panel h3 .bi {
+      color: var(--accent);
+    }
+
+    .doc-panel p {
+      margin: 0;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    .doc-list {
+      display: grid;
+      gap: var(--sp-2);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .doc-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--sp-2);
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    .doc-list .bi {
+      margin-top: .2rem;
+      color: var(--accent);
+    }
+
+    .doc-search {
+      position: relative;
+      margin: var(--sp-4) 0;
+    }
+
+    .doc-search i {
+      position: absolute;
+      left: var(--sp-3);
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-subtle);
+    }
+
+    .doc-search input {
+      width: 100%;
+      height: 48px;
+      padding: 0 var(--sp-3) 0 2.5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      color: var(--text);
+      font-size: var(--fs-md);
+    }
+
+    .doc-search input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-ring);
+    }
+
+    .doc-filter-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--sp-1);
+      min-height: 34px;
+      padding: 0 var(--sp-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: var(--fs-sm);
+      cursor: pointer;
+    }
+
+    .doc-filter-btn.is-active {
+      border-color: var(--accent);
+      background: var(--accent-tint);
+      color: var(--accent);
+    }
+
+    .doc-cat {
+      margin: var(--sp-7) 0;
+      padding-top: var(--sp-3);
+    }
+
+    .doc-cat-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: var(--sp-4);
+      margin-bottom: var(--sp-4);
+      padding-bottom: var(--sp-3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .doc-cat-title {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      margin: 0;
+      font-size: var(--fs-xl);
+    }
+
+    .doc-cat-title .bi {
+      color: var(--accent);
+    }
+
+    .doc-cat-desc {
+      max-width: 680px;
+      margin: var(--sp-2) 0 0;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .doc-cat-count {
+      flex: 0 0 auto;
+      color: var(--text-subtle);
+      font-size: var(--fs-sm);
+    }
+
+    .doc-tool {
+      margin-bottom: var(--sp-4);
+      padding: var(--sp-4) var(--sp-5);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      box-shadow: var(--shadow-xs);
+    }
+
+    .doc-tool-head {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--sp-3);
+    }
+
+    .doc-tool-icon {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-md);
+      background: var(--accent-tint);
+      color: var(--accent);
+      font-size: var(--fs-lg);
+    }
+
+    .doc-tool-title-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: var(--sp-2);
+      margin-bottom: var(--sp-1);
+    }
+
+    .doc-tool-title-row h3 {
+      margin: 0;
+      font-size: var(--fs-lg);
+    }
+
+    .doc-tool-desc {
+      margin: 0;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    .doc-status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 0 var(--sp-2);
+      border-radius: var(--radius-full);
+      font-size: var(--fs-xs);
+      font-weight: var(--fw-semibold);
+    }
+
+    .doc-status.ready {
+      background: var(--badge-new-bg);
+      color: var(--badge-new-text);
+    }
+
+    .doc-status.soon {
+      border: 1px dashed var(--border-strong);
+      background: var(--bg-subtle);
+      color: var(--text-subtle);
+    }
+
+    .doc-tool-detail {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--sp-4);
+      margin-top: var(--sp-4);
+      padding-top: var(--sp-4);
+      border-top: 1px dashed var(--border);
+    }
+
+    .doc-detail-block h4 {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      margin: 0 0 var(--sp-2);
+      color: var(--text-subtle);
+      font-size: var(--fs-xs);
+      font-weight: var(--fw-semibold);
+      text-transform: uppercase;
+    }
+
+    .doc-detail-block h4 .bi {
+      color: var(--accent);
+    }
+
+    .doc-detail-block p,
+    .doc-detail-block li {
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    .doc-detail-block p {
+      margin: 0;
+    }
+
+    .doc-detail-block ul,
+    .doc-detail-block ol {
+      margin: 0;
+      padding-left: var(--sp-5);
+    }
+
+    .doc-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--sp-2);
+      margin-top: var(--sp-4);
+    }
+
+    .doc-empty {
+      padding: var(--sp-8) 0;
+      color: var(--text-subtle);
+      text-align: center;
+    }
+
+    @media (max-width: 980px) {
+      .doc-shell {
+        display: block;
+        padding-right: var(--sp-4);
+        padding-left: var(--sp-4);
+      }
+
+      .doc-toc {
+        position: static;
+        max-height: none;
+        margin-bottom: var(--sp-5);
+      }
+
+      .doc-panel-grid,
+      .doc-tool-detail {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 
 <body>
-  <!-- Minimal navbar -->
   <nav class="app-navbar">
     <div class="navbar-left">
       <a class="brand" href="index.html">
-        <span class="brand-mark">🍋</span>
+        <span class="brand-mark" aria-hidden="true">PT</span>
         <span class="brand-text">Project <span class="brand-accent">Taste</span></span>
       </a>
     </div>
@@ -102,280 +443,533 @@
     </div>
   </nav>
 
-  <div class="doc-wrap" style="padding-top:calc(var(--navbar-h) + var(--sp-4))">
-    <!-- Category jump-nav -->
-    <aside class="doc-toc" id="docToc" aria-label="Documentation categories">
-      <h3>Categories</h3>
+  <div class="doc-shell">
+    <aside class="doc-toc" aria-label="Documentation navigation">
+      <p class="doc-toc-title">On this page</p>
+      <nav>
+        <a href="#overview"><i class="bi bi-info-circle"></i><span>Overview</span></a>
+        <a href="#problems"><i class="bi bi-exclamation-circle"></i><span>Problems solved</span></a>
+        <a href="#workflow"><i class="bi bi-list-check"></i><span>Workflow</span></a>
+        <a href="#catalog"><i class="bi bi-tools"></i><span>Tool catalog</span></a>
+      </nav>
+      <p class="doc-toc-title" style="margin-top:var(--sp-4)">Categories</p>
       <nav id="tocList"></nav>
     </aside>
 
-    <!-- Main documentation -->
     <main class="doc-main">
-      <div class="doc-hero">
-        <h1>Project <span class="hero-accent">Taste</span> Docs</h1>
-        <p>Everything you can do with Taste — what each tool is, what it does, and how to get the most out of it. All tools run <strong>entirely in your browser</strong>; your data never leaves your machine.</p>
+      <section class="doc-hero" id="overview">
+        <span class="doc-eyebrow"><i class="bi bi-journal-text"></i> Detailed documentation</span>
+        <h1>Project Taste developer toolbox documentation</h1>
+        <p>
+          Project Taste is a privacy-first collection of browser-based developer tools. This page explains what the app is,
+          why it exists, how to use it, and what every registered tool is expected to do.
+        </p>
         <div class="doc-metarow" id="heroStats"></div>
-      </div>
+      </section>
 
-      <div class="doc-search">
-        <i class="bi bi-search"></i>
-        <input type="search" id="docSearch" placeholder="Search the docs…" autocomplete="off" />
-      </div>
+      <section class="doc-section" id="problems">
+        <h2>Problems Project Taste Solves</h2>
+        <p class="doc-section-intro">
+          Developers often need small utilities many times a day. The problem is not that these tools are complex; the
+          problem is that they are scattered, inconsistent, and often unsafe for sensitive content.
+        </p>
+        <div class="doc-panel-grid">
+          <article class="doc-panel">
+            <h3><i class="bi bi-window-stack"></i> Too many websites</h3>
+            <p>Common tasks like formatting JSON, decoding tokens, and converting text often require jumping between unrelated pages.</p>
+          </article>
+          <article class="doc-panel">
+            <h3><i class="bi bi-shield-lock"></i> Sensitive data risk</h3>
+            <p>API payloads, JWTs, logs, keys, and configuration snippets should not be pasted into unknown remote services.</p>
+          </article>
+          <article class="doc-panel">
+            <h3><i class="bi bi-speedometer2"></i> Workflow friction</h3>
+            <p>A utility should open fast, explain itself clearly, process input locally, and let the user copy or export the result.</p>
+          </article>
+        </div>
+      </section>
 
-      <div id="docBody">
-        <p class="doc-empty"><i class="bi bi-arrow-repeat" style="animation:spin 1s linear infinite"></i> Loading documentation…</p>
-      </div>
+      <section class="doc-section" id="workflow">
+        <h2>How To Use The App</h2>
+        <p class="doc-section-intro">
+          Project Taste is designed around quick movement: search, open, paste, process, copy, and continue working.
+        </p>
+        <ol class="doc-list">
+          <li><i class="bi bi-1-circle"></i><span>Open the app from `index.html` through a local static server.</span></li>
+          <li><i class="bi bi-2-circle"></i><span>Use the sidebar, global search, or `Ctrl + K` command palette to find a tool.</span></li>
+          <li><i class="bi bi-3-circle"></i><span>Paste text, upload a file, or enter the input required by the selected tool.</span></li>
+          <li><i class="bi bi-4-circle"></i><span>Use the tool action buttons to format, validate, convert, generate, inspect, or compare.</span></li>
+          <li><i class="bi bi-5-circle"></i><span>Copy, download, or reuse the output without leaving the browser.</span></li>
+        </ol>
+      </section>
+
+      <section class="doc-section">
+        <h2>Documentation Model</h2>
+        <div class="doc-panel-grid">
+          <article class="doc-panel">
+            <h3><i class="bi bi-database"></i> Registry driven</h3>
+            <p>Tool names, categories, descriptions, badges, icons, and statuses are loaded from `data/tools.json`.</p>
+          </article>
+          <article class="doc-panel">
+            <h3><i class="bi bi-hdd-network"></i> Local-first</h3>
+            <p>Tools are expected to process input in the browser. If a future tool needs network access, it should document that behavior.</p>
+          </article>
+          <article class="doc-panel">
+            <h3><i class="bi bi-code-square"></i> Easy to extend</h3>
+            <p>Each ready tool should have a matching `tools/&lt;tool-id&gt;.html` file and an initializer registered in `window.TasteTools`.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="doc-section" id="catalog">
+        <h2>Tool Catalog</h2>
+        <p class="doc-section-intro">
+          Search the catalog or filter by readiness. Each tool entry includes its purpose, common use cases, usage steps,
+          expected output, and privacy notes.
+        </p>
+
+        <div class="doc-search">
+          <i class="bi bi-search"></i>
+          <input type="search" id="docSearch" placeholder="Search tools, descriptions, categories, or use cases" autocomplete="off" />
+        </div>
+
+        <div class="doc-filter-row" aria-label="Tool status filters">
+          <button class="doc-filter-btn is-active" type="button" data-status-filter="all"><i class="bi bi-list"></i>All tools</button>
+          <button class="doc-filter-btn" type="button" data-status-filter="ready"><i class="bi bi-check-circle"></i>Ready</button>
+          <button class="doc-filter-btn" type="button" data-status-filter="soon"><i class="bi bi-clock-history"></i>Coming soon</button>
+        </div>
+
+        <div id="docBody">
+          <p class="doc-empty"><i class="bi bi-arrow-repeat"></i> Loading documentation...</p>
+        </div>
+      </section>
     </main>
   </div>
 
   <footer class="app-footer">
-    <p class="footer-text">Developed by a developer, for the developers, with <i class="bi bi-heart-fill footer-heart"></i> from an indie &amp; ML Engineer.</p>
-    <p class="footer-sub"><a href="index.html">Tools</a> · <a href="index.html#/about">About</a></p>
+    <p class="footer-text">Developed by a developer, for developers, from an indie and ML engineer.</p>
+    <p class="footer-sub"><a href="index.html">Tools</a> | <a href="index.html#/about">About</a></p>
   </footer>
 
   <div class="toast-taste" id="toast" role="status" aria-live="polite"></div>
 
-  <!-- utils + theme give us the toggle + storage for free -->
   <script src="assets/js/utils.js"></script>
   <script src="assets/js/theme.js"></script>
 
   <script>
-  /* =======================================================================
-     Detailed documentation content for tools we've BUILT.
-     Keyed by tool id (matches data/tools.json). Tools not listed here fall
-     back to their one-line `desc` from the registry, tagged accordingly.
-     ======================================================================= */
-  var DOCS = {
-    'json-escape-unescape': {
-      what: 'Converts a string into a JSON-safe escaped form (and back). Useful when you need to embed text inside a JSON value — e.g. pasting a multi-line body into a Postman request, a config file, or a log field.',
-      features: [
-        'Escape uses native <code>JSON.stringify</code> so every reserved character (<code>\\n</code>, <code>\\t</code>, <code>\\"</code>, <code>\\\\</code>, etc.) is handled correctly.',
-        'Unescape parses the string back, with a manual fallback for partially-broken tokens.',
-        'Swap moves the result into the input for quick chaining.',
-        'Live character &amp; byte count on the result.'
-      ],
-      usage: [
-        'Paste raw text (or an escaped string) into the input.',
-        'Click <strong>Escape</strong> or <strong>Unescape</strong>.',
-        'Copy the result, or Swap it back into the input to reverse.'
-      ],
-      shortcuts: ['<kbd>Ctrl/⌘</kbd> + <kbd>Enter</kbd> — escape instantly'],
-      extras: ['Drag &amp; drop a text file onto the input', 'Input auto-saves and is restored next visit']
-    },
-    'base64': {
-      what: 'Encodes and decodes Base64 for both text and files. Handles UTF-8 correctly (emojis and non-Latin text round-trip cleanly) and can produce Base64 data URIs from images with a live preview.',
-      features: [
-        'UTF-8 safe: uses <code>TextEncoder</code>/<code>TextDecoder</code> so <code>btoa</code>-style corruption never happens.',
-        'URL-safe variant (<code>-</code>/<code>_</code>, no padding) for tokens and query strings.',
-        'File mode: drop any file to get its Base64 data URI, with optional <code>data:…;base64,</code> prefix.',
-        'Automatic image preview for image files.'
-      ],
-      usage: [
-        'Choose <strong>Text</strong> or <strong>File / Image</strong> mode.',
-        'For text: type/paste, then Encode or Decode.',
-        'For files: drop or browse a file — the Base64 output and preview appear instantly.'
-      ],
-      shortcuts: ['<kbd>Ctrl/⌘</kbd> + <kbd>Enter</kbd> — encode text'],
-      extras: ['Toggle URL-safe output', 'Copy or download either text or file output']
-    },
-    'case-converter': {
-      what: 'Transforms text between every common developer case style at once — no need to pick one at a time. A single smart tokenizer understands spaces, punctuation and camelCase boundaries, so any input converts cleanly.',
-      features: [
-        '10 formats: UPPERCASE, lowercase, Title Case, Sentence case, camelCase, PascalCase, snake_case, CONSTANT_CASE, kebab-case, dot.case.',
-        'Works on mixed input like <code>myVariable-name</code> or <code>Some Title</code> identically.',
-        'Per-format one-click copy.',
-        'Live word / character / byte stats.'
-      ],
-      usage: [
-        'Type or paste text — all conversions update live.',
-        'Click the copy icon next to any format to copy it.'
-      ],
-      shortcuts: [],
-      extras: ['Drag &amp; drop a text file', 'Input auto-saves']
-    },
-    'text-diff': {
-      what: 'Compares two blocks of text line-by-line and highlights exactly what was added, removed or left unchanged — like <code>git diff</code>, but in your browser for any text.',
-      features: [
-        'Real Longest-Common-Subsequence (LCS) algorithm — accurate on code, JSON or prose.',
-        'Color-coded output with +/− gutters and line numbers.',
-        'Ignore-case and ignore-whitespace options affect matching only, not the displayed text.',
-        'Added / removed / unchanged counts as stat chips.'
-      ],
-      usage: [
-        'Paste the original into pane A and the changed version into pane B.',
-        'Click <strong>Compare</strong>.',
-        'Optionally toggle Ignore case / whitespace, or Swap A↔B.'
-      ],
-      shortcuts: [],
-      extras: ['Drag &amp; drop a file onto either pane', 'Copy or download the unified diff', 'Both inputs auto-save']
-    },
-    'uuid': {
-      what: 'Generates cryptographically-strong UUIDs in bulk. Supports random (v4), time-ordered (v7) and the nil UUID, with formatting options.',
-      features: [
-        'Uses the browser CSPRNG (<code>crypto.getRandomValues</code>/<code>randomUUID</code>) — safe for real IDs.',
-        'v7 embeds a millisecond timestamp so IDs sort chronologically — great for database keys.',
-        'Formatting: uppercase, braces, or hyphen-free — applied without re-randomizing values.',
-        'Generate up to 500 at once; copy one, copy all, or download.'
-      ],
-      usage: [
-        'Pick a version (v4 / v7 / Nil) and a quantity.',
-        'Click <strong>Generate</strong>.',
-        'Copy individual values, Copy All, or Download as a text file.'
-      ],
-      shortcuts: ['<kbd>Enter</kbd> in the quantity box — generate'],
-      extras: ['Format toggles preserve the generated values']
-    },
-    'json-formatter': {
-      what: 'Pretty-prints, minifies and validates JSON. When JSON is invalid it pinpoints the exact line and column of the error so you can fix it fast.',
-      features: [
-        'Format with 2/4-space or tab indentation.',
-        'Minify to the smallest valid payload.',
-        'Validation reports precise <em>line : column</em> of syntax errors.',
-        'Optional recursive key sorting (arrays keep their order).',
-        'Stats: key count, nesting depth, and size before → after.'
-      ],
-      usage: [
-        'Paste JSON into the input.',
-        'Click <strong>Format</strong>, <strong>Minify</strong> or <strong>Validate</strong>.',
-        'Adjust indent or Sort keys — the output re-formats live.'
-      ],
-      shortcuts: ['<kbd>Ctrl/⌘</kbd> + <kbd>Enter</kbd> — format'],
-      extras: ['Drag &amp; drop a .json file', 'Copy or download the result', 'Input auto-saves']
-    }
-  };
-
   (function () {
-    var T = window.Taste;
-    var el = T.el, $ = T.$;
+    'use strict';
 
-    fetch('data/tools.json', { cache: 'no-cache' })
-      .then(function (r) { return r.json(); })
-      .then(render)
-      .catch(function () {
-        $('#docBody').innerHTML = '<p class="doc-empty">Couldn’t load the tool registry. Make sure data/tools.json is present.</p>';
-      });
+    var T = window.Taste;
+    if (!T) return;
+
+    var $ = T.$;
+    var $$ = T.$$;
+    var el = T.el;
+    var activeStatus = 'all';
+    var activeQuery = '';
+
+    var CATEGORY_GUIDES = {
+      text: {
+        overview: 'Text tools help clean, reshape, compare, count, sort, and generate plain text without opening a separate editor.',
+        uses: ['Cleaning copied data', 'Preparing slugs and labels', 'Comparing notes, configs, or code snippets'],
+        inputs: 'Plain text, copied lines, names, paragraphs, identifiers, or code snippets.',
+        output: 'Cleaned, converted, sorted, counted, compared, or generated text.'
+      },
+      json: {
+        overview: 'JSON tools help format, validate, compare, transform, query, and prepare JSON for APIs, logs, and configuration.',
+        uses: ['Debugging API payloads', 'Preparing Postman requests', 'Converting data between JSON, CSV, and YAML'],
+        inputs: 'JSON objects, arrays, strings, API responses, logs, or JSONPath expressions.',
+        output: 'Readable JSON, validation feedback, converted data, diffs, or extracted values.'
+      },
+      data: {
+        overview: 'Data and config tools handle structured files such as XML, YAML, TOML, CSV, SQL, and query plans.',
+        uses: ['Validating config files', 'Formatting database queries', 'Inspecting tabular or structured data'],
+        inputs: 'Config files, SQL queries, CSV tables, XML documents, YAML files, TOML files, or SQL result data.',
+        output: 'Formatted documents, validation messages, tables, JSON output, or visual query explanations.'
+      },
+      encoding: {
+        overview: 'Encoding tools convert text and tokens between formats used in URLs, HTML, Unicode, Base64, and JWT workflows.',
+        uses: ['Preparing API-safe strings', 'Inspecting JWTs', 'Encoding payloads for transport'],
+        inputs: 'URLs, HTML fragments, Unicode text, Base64 strings, JWTs, or token claims.',
+        output: 'Encoded text, decoded text, token details, expiry information, or edited payloads.'
+      },
+      crypto: {
+        overview: 'Crypto and key tools focus on inspecting certificates and generating keys in a browser-first workflow.',
+        uses: ['Checking certificate metadata', 'Generating SSH keys', 'Understanding PEM content'],
+        inputs: 'PEM certificates, public keys, private keys, or key generation options.',
+        output: 'Readable key details, certificate metadata, or generated key pairs.'
+      },
+      hashing: {
+        overview: 'Hashing tools create checksums, digests, and keyed signatures for integrity checks and developer workflows.',
+        uses: ['Verifying file integrity', 'Creating content digests', 'Generating keyed HMAC signatures'],
+        inputs: 'Text, files, secrets, or hashing algorithm options.',
+        output: 'Hash digests, checksums, or keyed signatures.'
+      },
+      generators: {
+        overview: 'Generator tools create IDs, passwords, mock data, colors, placeholders, and configuration scaffolds.',
+        uses: ['Creating test data', 'Generating secure identifiers', 'Scaffolding project values'],
+        inputs: 'Quantity, length, format options, character sets, templates, or generation settings.',
+        output: 'Generated values such as UUIDs, passwords, API keys, fake users, colors, or .env content.'
+      },
+      web: {
+        overview: 'Web and CSS tools support frontend work such as formatting markup, minifying assets, and generating layout code.',
+        uses: ['Cleaning frontend code', 'Creating responsive CSS', 'Generating layout snippets'],
+        inputs: 'HTML, CSS, JavaScript, GraphQL, Tailwind classes, or layout settings.',
+        output: 'Formatted code, minified code, CSS snippets, GraphQL output, or generated layout rules.'
+      },
+      colors: {
+        overview: 'Color tools help convert color formats, generate visual effects, and check accessibility.',
+        uses: ['Designing UI styles', 'Checking contrast', 'Building gradients and shadows'],
+        inputs: 'HEX, RGB, HSL values, palette colors, effect settings, or foreground/background pairs.',
+        output: 'Converted colors, CSS declarations, palettes, accessibility feedback, or previews.'
+      },
+      markdown: {
+        overview: 'Markdown tools help write, preview, and convert documentation between Markdown and HTML.',
+        uses: ['Writing README files', 'Previewing docs', 'Converting content between formats'],
+        inputs: 'Markdown text, HTML markup, tables, links, or documentation content.',
+        output: 'Rendered previews, HTML output, or Markdown output.'
+      },
+      images: {
+        overview: 'Image tools focus on SVG, Base64 image data, resizing, QR codes, favicons, and sprite workflows.',
+        uses: ['Preparing frontend assets', 'Creating QR codes', 'Optimizing SVG markup'],
+        inputs: 'Images, SVG markup, URLs, text, dimensions, or icon source files.',
+        output: 'Optimized images, previews, QR codes, favicons, Base64 URIs, or sprite sheets.'
+      },
+      datetime: {
+        overview: 'Date and time tools convert timestamps, generate cron expressions, parse schedules, and compare time zones.',
+        uses: ['Debugging timestamps', 'Planning cron jobs', 'Coordinating across time zones'],
+        inputs: 'Unix timestamps, dates, time zones, cron settings, or schedule expressions.',
+        output: 'Converted dates, cron expressions, parsed schedules, or time zone results.'
+      },
+      regex: {
+        overview: 'Regex tools help test, generate, and learn regular expressions with practical examples.',
+        uses: ['Validating patterns', 'Learning regex syntax', 'Generating regex from plain-language intent'],
+        inputs: 'Regex patterns, sample text, flags, or natural language pattern descriptions.',
+        output: 'Highlighted matches, generated patterns, explanations, or reference snippets.'
+      },
+      networking: {
+        overview: 'Networking tools help inspect URLs, headers, cookies, requests, status codes, MIME types, and IP ranges.',
+        uses: ['Debugging HTTP requests', 'Inspecting browser strings', 'Preparing API calls'],
+        inputs: 'URLs, headers, curl commands, cookies, User-Agent strings, IP ranges, or API responses.',
+        output: 'Parsed fields, request code, explanations, formatted responses, or network calculations.'
+      },
+      devops: {
+        overview: 'DevOps tools support deployment, infrastructure, logs, versioning, Git workflows, and configuration references.',
+        uses: ['Formatting infrastructure files', 'Cleaning logs', 'Generating project metadata'],
+        inputs: 'Docker files, Kubernetes YAML, Terraform HCL, server configs, logs, stack traces, or commit data.',
+        output: 'Formatted configs, references, generated files, cleaned logs, or workflow helpers.'
+      },
+      diagrams: {
+        overview: 'Diagram tools render diagram syntax into visual previews for technical documentation and architecture notes.',
+        uses: ['Documenting architecture', 'Previewing sequence diagrams', 'Sharing system flows'],
+        inputs: 'Mermaid or PlantUML diagram source.',
+        output: 'Live rendered diagrams or validation feedback.'
+      },
+      ai: {
+        overview: 'AI tools help prepare prompts and estimate token usage before sending content to language models.',
+        uses: ['Structuring prompts', 'Estimating model context usage', 'Cleaning AI instructions'],
+        inputs: 'Prompts, system instructions, examples, or long text blocks.',
+        output: 'Cleaner prompts, structured prompt sections, or token estimates.'
+      }
+    };
+
+    var TOOL_DETAILS = {
+      'json-escape-unescape': {
+        what: 'Escapes raw text so it can safely live inside a JSON string, and reverses escaped JSON strings back into readable text.',
+        steps: ['Paste raw or escaped text.', 'Choose Escape or Unescape.', 'Copy the result or swap it back into the input for another pass.'],
+        notes: ['Useful for Postman bodies, logs, config values, and nested JSON strings.', 'Handles newline, tab, quote, slash, and backslash escaping.']
+      },
+      'base64': {
+        what: 'Encodes and decodes Base64 for text, files, and images while keeping Unicode text safe.',
+        steps: ['Choose text or file mode.', 'Paste text or drop a file.', 'Encode, decode, copy, download, or preview the result.'],
+        notes: ['Useful for API credentials, data URIs, quick file previews, and transport-safe payloads.']
+      },
+      'text-diff': {
+        what: 'Compares two text inputs and highlights added, removed, and unchanged lines.',
+        steps: ['Paste the original text in the first panel.', 'Paste the changed text in the second panel.', 'Run Compare and review the highlighted differences.'],
+        notes: ['Useful for configs, notes, JSON, logs, code snippets, and copy review.']
+      },
+      'case-converter': {
+        what: 'Converts a phrase or identifier into common naming styles used in code and content.',
+        steps: ['Paste the source text.', 'Review each generated case style.', 'Copy the format you need.'],
+        notes: ['Useful for variables, filenames, URLs, headings, constants, and database fields.']
+      },
+      'json-formatter': {
+        what: 'Formats, minifies, validates, and cleans JSON so it becomes easier to inspect or share.',
+        steps: ['Paste JSON into the input.', 'Format, minify, validate, or sort keys.', 'Copy or download the cleaned output.'],
+        notes: ['Useful for API debugging, logs, config files, and response inspection.']
+      },
+      'uuid': {
+        what: 'Generates unique identifiers in bulk for development, testing, database records, and mock data.',
+        steps: ['Choose UUID version and quantity.', 'Generate values.', 'Copy one value, copy all values, or download the list.'],
+        notes: ['Use UUIDs when records need stable unique identifiers without a central counter.']
+      }
+    };
+
+    function normalizeText(value) {
+      var bothArrow = String.fromCharCode(0x00e2, 0x2020, 0x201d);
+      var rightArrow = String.fromCharCode(0x00e2, 0x2020, 0x2019);
+      var dash = String.fromCharCode(0x00e2, 0x20ac, 0x201d);
+      var ellipsis = String.fromCharCode(0x00e2, 0x20ac, 0x00a6);
+      return String(value || '')
+        .replace(new RegExp(bothArrow, 'g'), '<->')
+        .replace(new RegExp(rightArrow, 'g'), '->')
+        .replace(new RegExp(dash, 'g'), '-')
+        .replace(new RegExp(ellipsis, 'g'), '...');
+    }
+
+    function cleanText(value) {
+      return normalizeText(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function textOnly(value) {
+      return normalizeText(value);
+    }
+
+    function statusLabel(status) {
+      return status === 'ready' ? 'Ready' : 'Coming soon';
+    }
 
     function badgeChips(badges) {
-      var map = { popular: ['badge-hot','bi-fire','Popular'], 'new': ['badge-new','bi-stars','New'], niche: ['badge-niche','bi-gem','Niche'] };
-      return (badges || []).filter(function (b){ return map[b]; }).map(function (b) {
-        var m = map[b];
-        return el('span', { class: 'badge-taste ' + m[0], title: m[2] }, [ el('i', { class: 'bi ' + m[1] }) ]);
+      var map = {
+        popular: ['badge-hot', 'bi-fire', 'Popular'],
+        'new': ['badge-new', 'bi-stars', 'New'],
+        niche: ['badge-niche', 'bi-gem', 'Niche']
+      };
+      return (badges || []).filter(function (badge) { return map[badge]; }).map(function (badge) {
+        var meta = map[badge];
+        return el('span', { class: 'badge-taste ' + meta[0], title: meta[2] }, [
+          el('i', { class: 'bi ' + meta[1] })
+        ]);
       });
     }
 
-    function detailBlock(id) {
-      var d = DOCS[id];
-      if (!d) return null;
-      var wrap = el('div', { class: 'doc-detail' });
-
-      wrap.appendChild(el('h5', {}, [ el('i', { class: 'bi bi-info-circle' }), document.createTextNode('What it does') ]));
-      wrap.appendChild(el('p', { html: d.what, style: 'margin:0;color:var(--text)' }));
-
-      function section(title, icon, items, asHtml) {
-        if (!items || !items.length) return;
-        wrap.appendChild(el('h5', {}, [ el('i', { class: 'bi ' + icon }), document.createTextNode(title) ]));
-        var ul = el('ul', {});
-        items.forEach(function (it) { ul.appendChild(el('li', { html: it })); });
-        wrap.appendChild(ul);
-      }
-      section('Key features', 'bi-stars', d.features);
-      section('How to use', 'bi-play-circle', d.usage);
-      section('Keyboard shortcuts', 'bi-keyboard', d.shortcuts);
-      section('Extras', 'bi-plus-circle', d.extras);
-
-      return wrap;
+    function detailList(items, ordered) {
+      var node = el(ordered ? 'ol' : 'ul');
+      items.forEach(function (item) {
+        node.appendChild(el('li', { html: cleanText(item) }));
+      });
+      return node;
     }
 
-    function toolCard(tool, catName) {
-      var head = el('div', { class: 'doc-tool-head' }, [
-        el('div', { class: 'doc-tool-icon' }, [ el('i', { class: 'bi ' + (tool.icon || 'bi-tools') }) ]),
-        el('div', { class: 'doc-tool-headtext' }, [
-          el('h4', {}, [
-            document.createTextNode(tool.name),
-            el('span', { class: 'doc-status ' + (tool.status === 'ready' ? 'ready' : 'soon'),
-              text: tool.status === 'ready' ? 'Ready' : 'Coming soon' })
-          ].concat(badgeChips(tool.badges))),
-          el('p', { text: tool.desc || '' })
-        ])
+    function detailBlock(title, icon, body) {
+      return el('div', { class: 'doc-detail-block' }, [
+        el('h4', {}, [el('i', { class: 'bi ' + icon }), document.createTextNode(title)]),
+        body
+      ]);
+    }
+
+    function buildToolDetail(tool, category) {
+      var guide = CATEGORY_GUIDES[tool.category] || CATEGORY_GUIDES.text;
+      var custom = TOOL_DETAILS[tool.id] || {};
+      var what = custom.what || (textOnly(tool.desc) + ' This tool belongs to the ' + category.name + ' category and is designed for quick, focused developer work.');
+      var steps = custom.steps || [
+        tool.status === 'ready' ? 'Open the tool from the app or documentation link.' : 'Use this documentation as the planned behavior until the tool is implemented.',
+        'Provide the required input: ' + guide.inputs,
+        'Run the main action and review the output.',
+        'Copy or export the result when available.'
+      ];
+      var notes = custom.notes || guide.uses;
+
+      return el('div', { class: 'doc-tool-detail' }, [
+        detailBlock('What it does', 'bi-info-circle', el('p', { html: cleanText(what) })),
+        detailBlock('When to use it', 'bi-lightbulb', detailList(notes, false)),
+        detailBlock('How to use it', 'bi-list-check', detailList(steps, true)),
+        detailBlock('Expected output', 'bi-box-arrow-up-right', el('p', { html: cleanText(guide.output) })),
+        detailBlock('Input type', 'bi-input-cursor-text', el('p', { html: cleanText(guide.inputs) })),
+        detailBlock('Privacy note', 'bi-shield-lock', el('p', { text: tool.status === 'ready' ? 'Designed to process input locally in your browser.' : 'Planned to follow the same local-first privacy model when implemented.' }))
+      ]);
+    }
+
+    function buildToolCard(tool, category) {
+      var cleanName = textOnly(tool.name);
+      var cleanDesc = textOnly(tool.desc);
+      var guide = CATEGORY_GUIDES[tool.category] || CATEGORY_GUIDES.text;
+      var searchable = [
+        cleanName,
+        cleanDesc,
+        category.name,
+        statusLabel(tool.status),
+        guide.overview,
+        guide.uses.join(' ')
+      ].join(' ').toLowerCase();
+
+      var titleRow = [
+        el('h3', { text: cleanName }),
+        el('span', {
+          class: 'doc-status ' + (tool.status === 'ready' ? 'ready' : 'soon'),
+          text: statusLabel(tool.status)
+        })
+      ].concat(badgeChips(tool.badges));
+
+      var card = el('article', {
+        class: 'doc-tool',
+        dataset: { search: searchable, status: tool.status }
+      }, [
+        el('div', { class: 'doc-tool-head' }, [
+          el('div', { class: 'doc-tool-icon' }, [el('i', { class: 'bi ' + (tool.icon || 'bi-tools') })]),
+          el('div', {}, [
+            el('div', { class: 'doc-tool-title-row' }, titleRow),
+            el('p', { class: 'doc-tool-desc', text: cleanDesc })
+          ])
+        ]),
+        buildToolDetail(tool, category)
       ]);
 
-      var card = el('div', { class: 'doc-tool', dataset: { search: (tool.name + ' ' + (tool.desc||'') + ' ' + catName).toLowerCase() } }, [head]);
-
-      var detail = detailBlock(tool.id);
-      if (detail) card.appendChild(detail);
-
+      var actions = el('div', { class: 'doc-actions' });
       if (tool.status === 'ready') {
-        card.appendChild(el('a', { class: 'btn-taste btn-taste-primary btn-taste-sm doc-open-btn',
-          href: 'index.html#/' + tool.id }, [ el('i', { class: 'bi bi-box-arrow-up-right' }),
-          document.createTextNode(' Open tool') ]));
+        actions.appendChild(el('a', {
+          class: 'btn-taste btn-taste-primary btn-taste-sm',
+          href: 'index.html#/' + tool.id
+        }, [el('i', { class: 'bi bi-box-arrow-up-right' }), document.createTextNode(' Open tool')]));
+      } else {
+        actions.appendChild(el('span', {
+          class: 'btn-taste btn-taste-ghost btn-taste-sm',
+          text: 'Planned tool'
+        }));
       }
+      card.appendChild(actions);
       return card;
+    }
+
+    function buildCategorySection(category, tools) {
+      var guide = CATEGORY_GUIDES[category.id] || CATEGORY_GUIDES.text;
+      var section = el('section', { class: 'doc-cat', id: 'cat-' + category.id });
+      section.appendChild(el('div', { class: 'doc-cat-head' }, [
+        el('div', {}, [
+          el('h2', { class: 'doc-cat-title' }, [
+            el('i', { class: 'bi ' + (category.icon || 'bi-folder') }),
+            document.createTextNode(textOnly(category.name))
+          ]),
+          el('p', { class: 'doc-cat-desc', text: guide.overview })
+        ]),
+        el('span', { class: 'doc-cat-count', text: tools.length + ' tools' })
+      ]));
+      tools.forEach(function (tool) {
+        section.appendChild(buildToolCard(tool, category));
+      });
+      return section;
+    }
+
+    function updateFilters() {
+      var visibleTools = 0;
+      $$('.doc-tool').forEach(function (card) {
+        var queryMatch = !activeQuery || card.dataset.search.indexOf(activeQuery) !== -1;
+        var statusMatch = activeStatus === 'all' || card.dataset.status === activeStatus;
+        var show = queryMatch && statusMatch;
+        card.style.display = show ? '' : 'none';
+        if (show) visibleTools += 1;
+      });
+
+      $$('.doc-cat').forEach(function (section) {
+        var hasVisible = $$('.doc-tool', section).some(function (card) {
+          return card.style.display !== 'none';
+        });
+        section.style.display = hasVisible ? '' : 'none';
+      });
+
+      var empty = $('#docEmptyState');
+      if (!empty) return;
+      empty.style.display = visibleTools ? 'none' : '';
+    }
+
+    function renderStats(data, categories) {
+      var meta = data.meta || {};
+      var tools = data.tools || [];
+      var ready = tools.filter(function (tool) { return tool.status === 'ready'; }).length;
+      var stats = [
+        ['bi-tools', String(meta.toolCount || tools.length), 'tools'],
+        ['bi-check-circle', String(ready), 'ready'],
+        ['bi-clock-history', String(tools.length - ready), 'coming soon'],
+        ['bi-collection', String(categories.length), 'categories'],
+        ['bi-shield-lock', 'local', 'first']
+      ];
+      var row = $('#heroStats');
+      row.innerHTML = '';
+      stats.forEach(function (stat) {
+        row.appendChild(el('span', { class: 'stat-chip' }, [
+          el('i', { class: 'bi ' + stat[0] }),
+          el('strong', { text: stat[1] }),
+          document.createTextNode(' ' + stat[2])
+        ]));
+      });
     }
 
     function render(data) {
       var body = $('#docBody');
       var toc = $('#tocList');
-      var hero = $('#heroStats');
-      body.innerHTML = ''; toc.innerHTML = '';
+      var categories = (data.categories || []).slice().sort(function (a, b) {
+        return (a.order || 0) - (b.order || 0);
+      });
+      var byCategory = {};
 
-      var cats = (data.categories || []).slice().sort(function (a,b){ return (a.order||0)-(b.order||0); });
-      var byCat = {};
-      (data.tools || []).forEach(function (t) { (byCat[t.category] = byCat[t.category] || []).push(t); });
+      body.innerHTML = '';
+      toc.innerHTML = '';
 
-      // hero stats
-      var readyCount = (data.tools||[]).filter(function(t){return t.status==='ready';}).length;
-      [['bi-tools', (data.meta && data.meta.toolCount || (data.tools||[]).length) + ' tools'],
-       ['bi-check-circle', readyCount + ' ready'],
-       ['bi-collection', cats.length + ' categories'],
-       ['bi-shield-lock', '100% local']
-      ].forEach(function (s) {
-        hero.appendChild(el('span', { class: 'stat-chip' }, [
-          el('i', { class: 'bi ' + s[0] }),
-          el('strong', { text: String(s[1]).split(' ')[0] }),
-          document.createTextNode(' ' + s[1].split(' ').slice(1).join(' '))
-        ]));
+      (data.tools || []).forEach(function (tool) {
+        (byCategory[tool.category] = byCategory[tool.category] || []).push(tool);
       });
 
-      cats.forEach(function (cat) {
-        var tools = byCat[cat.id] || [];
+      renderStats(data, categories);
+
+      categories.forEach(function (category) {
+        var tools = byCategory[category.id] || [];
         if (!tools.length) return;
 
-        // TOC entry
-        toc.appendChild(el('a', { href: '#cat-' + cat.id }, [
-          el('i', { class: 'bi ' + (cat.icon || 'bi-folder') }),
-          document.createTextNode(' ' + cat.name),
+        toc.appendChild(el('a', { href: '#cat-' + category.id }, [
+          el('i', { class: 'bi ' + (category.icon || 'bi-folder') }),
+          el('span', { text: textOnly(category.name) }),
           el('span', { class: 'count', text: String(tools.length) })
         ]));
 
-        // Section
-        var section = el('section', { class: 'doc-cat', id: 'cat-' + cat.id });
-        section.appendChild(el('h3', { class: 'doc-cat-title' }, [
-          el('i', { class: 'bi ' + (cat.icon || 'bi-folder') }),
-          document.createTextNode(cat.name + ' '),
-          el('span', { class: 'count', text: '(' + tools.length + ')' })
-        ]));
-        tools.forEach(function (t) { section.appendChild(toolCard(t, cat.name)); });
-        body.appendChild(section);
+        body.appendChild(buildCategorySection(category, tools));
       });
 
-      wireSearch();
+      body.appendChild(el('p', {
+        id: 'docEmptyState',
+        class: 'doc-empty',
+        style: 'display:none',
+        text: 'No tools match the current search or filter.'
+      }));
+
+      wireEvents();
     }
 
-    function wireSearch() {
-      var input = $('#docSearch');
-      var run = T.debounce(function (q) {
-        q = (q || '').trim().toLowerCase();
-        T.$$('.doc-tool').forEach(function (card) {
-          card.style.display = (!q || card.dataset.search.indexOf(q) !== -1) ? '' : 'none';
-        });
-        // hide empty category sections
-        T.$$('.doc-cat').forEach(function (sec) {
-          var any = T.$$('.doc-tool', sec).some(function (c){ return c.style.display !== 'none'; });
-          sec.style.display = any ? '' : 'none';
-        });
+    function wireEvents() {
+      var search = $('#docSearch');
+      var runSearch = T.debounce(function (value) {
+        activeQuery = String(value || '').trim().toLowerCase();
+        updateFilters();
       }, 120);
-      T.on(input, 'input', function (e) { run(e.target.value); });
+
+      T.on(search, 'input', function (event) {
+        runSearch(event.target.value);
+      });
+
+      $$('.doc-filter-btn').forEach(function (button) {
+        T.on(button, 'click', function () {
+          activeStatus = button.dataset.statusFilter || 'all';
+          $$('.doc-filter-btn').forEach(function (btn) {
+            btn.classList.toggle('is-active', btn === button);
+          });
+          updateFilters();
+        });
+      });
     }
+
+    fetch('data/tools.json', { cache: 'no-cache' })
+      .then(function (response) {
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.json();
+      })
+      .then(render)
+      .catch(function () {
+        $('#docBody').innerHTML = '<p class="doc-empty">Could not load data/tools.json. Run the project through a local static server and try again.</p>';
+      });
   })();
   </script>
 </body>
