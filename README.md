@@ -6,6 +6,10 @@ The long-term goal of Project Taste is to provide more than 150 useful tools for
 
 Tagline: A little taste of the perfect toolkit.
 
+## Live Link
+
+[Link](avarshvir.github.io/project-taste/)
+
 ## What Is Project Taste?
 
 Project Taste is a static web application built with HTML, CSS, and JavaScript. It runs directly in the browser and is designed around privacy-first utility work:
