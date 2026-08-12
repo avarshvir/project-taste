@@ -511,7 +511,7 @@
       "icon": "bi-hash",
       "desc": "Compute SHA-1 hashes.",
       "badges": [],
-      "status": "soon"
+      "status": "ready"
     },
     {
       "id": "sha256",

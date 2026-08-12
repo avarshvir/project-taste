@@ -1,0 +1,123 @@
+<!-- =========================================================================
+     Project Taste — tools/sha1.html
+     SHA1 generator. Runs fully in the browser using SubtleCrypto and the
+     existing TasteTools contract.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-hash"></i></div>
+  <div class="tool-header-text">
+    <h1>SHA1 Generator</h1>
+    <p>Compute an SHA-1 digest for any text. Everything stays local in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="sha1-input">Input</label>
+      <textarea id="sha1-input" class="textarea-taste" placeholder="Enter text to hash…" spellcheck="false"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="sha1-output">SHA1 Digest</label>
+      <textarea id="sha1-output" class="textarea-taste" placeholder="SHA1 hash appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div id="sha1-status" class="jx-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="hash"><i class="bi bi-hash"></i> Compute SHA1</button>
+    <button class="btn-taste btn-taste-success" data-act="copy"><i class="bi bi-clipboard-check"></i> Copy</button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample"><i class="bi bi-magic"></i> Sample</button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+</div>
+
+<style>
+  .jx-status { padding: var(--sp-2) var(--sp-3); margin-bottom: var(--sp-3); border-radius: var(--radius-md);
+    font-size: var(--fs-sm); font-weight: var(--fw-medium); display:flex; align-items:center; gap:var(--sp-2); }
+  .jx-status.err { background: rgba(220,38,38,0.12); color: var(--danger); }
+  .jx-status.ok  { background: var(--badge-new-bg); color: var(--badge-new-text); }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+  window.TasteTools['sha1'] = function (root, tool, Taste) {
+    'use strict';
+
+    var $ = Taste.$;
+    var inputEl = $('#sha1-input', root);
+    var outputEl = $('#sha1-output', root);
+    var statusEl = $('#sha1-status', root);
+    var SAVE_KEY = 'tool:sha1:input';
+
+    function showStatus(kind, message) {
+      statusEl.hidden = false;
+      statusEl.className = 'jx-status ' + kind;
+      statusEl.innerHTML = '';
+      statusEl.appendChild(Taste.el('i', { class: 'bi ' + (kind === 'ok' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill') }));
+      statusEl.appendChild(Taste.el('span', { text: message }));
+    }
+
+    function toHex(buffer) {
+      return Array.from(new Uint8Array(buffer))
+        .map(function (byte) { return byte.toString(16).padStart(2, '0'); })
+        .join('');
+    }
+
+    async function computeHash() {
+      var text = inputEl.value;
+      if (!text) {
+        outputEl.value = '';
+        showStatus('err', 'Enter text to hash first.');
+        return;
+      }
+      try {
+        var data = new TextEncoder().encode(text);
+        var digest = await crypto.subtle.digest('SHA-1', data);
+        outputEl.value = toHex(digest);
+        showStatus('ok', 'SHA1 digest computed.');
+      } catch (err) {
+        outputEl.value = '';
+        showStatus('err', 'Hash failed: ' + err.message);
+      }
+    }
+
+    var actions = {
+      hash: computeHash,
+      copy: function () { Taste.copy(outputEl.value); },
+      sample: function () {
+        inputEl.value = 'The quick brown fox jumps over the lazy dog';
+        computeHash();
+      },
+      clear: function () {
+        inputEl.value = '';
+        outputEl.value = '';
+        statusEl.hidden = true;
+        Taste.store.remove(SAVE_KEY);
+      }
+    };
+
+    Taste.on(root, 'click', '[data-act]', function (event, node) {
+      event.preventDefault();
+      var action = actions[node.dataset.act];
+      if (action) action();
+    });
+
+    Taste.on(inputEl, 'input', Taste.debounce(function () {
+      Taste.store.set(SAVE_KEY, inputEl.value);
+    }, 300));
+
+    Taste.on(inputEl, 'keydown', function (event) {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        computeHash();
+      }
+    });
+
+    var saved = Taste.store.get(SAVE_KEY, '');
+    if (saved) inputEl.value = saved;
+    inputEl.focus();
+  };
+</script>
