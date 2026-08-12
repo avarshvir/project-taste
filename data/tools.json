@@ -502,7 +502,7 @@
       "icon": "bi-hash",
       "desc": "Compute MD5 digests of text or files.",
       "badges": [],
-      "status": "soon"
+      "status": "ready"
     },
     {
       "id": "sha1",
