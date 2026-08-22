@@ -1,0 +1,188 @@
+<!-- =========================================================================
+     Project Taste — tools/crc32.html
+     CRC32 checksum generator.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-hash"></i></div>
+  <div class="tool-header-text">
+    <h1>CRC32 Generator</h1>
+    <p>Compute a CRC32 checksum for any text. Everything stays local in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="crc32-input">Input</label>
+      <textarea id="crc32-input" class="textarea-taste"
+        placeholder="Enter text to checksum…" spellcheck="false"></textarea>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="crc32-output">CRC32 Checksum</label>
+      <textarea id="crc32-output" class="textarea-taste"
+        placeholder="CRC32 checksum appears here…" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+
+  <div id="crc32-status" class="crc32-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="hash">
+      <i class="bi bi-hash"></i> Compute CRC32
+    </button>
+    <button class="btn-taste btn-taste-success" data-act="copy">
+      <i class="bi bi-clipboard-check"></i> Copy
+    </button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample">
+      <i class="bi bi-magic"></i> Sample
+    </button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear">
+      <i class="bi bi-x-circle"></i> Clear
+    </button>
+  </div>
+</div>
+
+<style>
+  .crc32-status {
+    padding: var(--sp-2) var(--sp-3);
+    margin-bottom: var(--sp-3);
+    border-radius: var(--radius-md);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .crc32-status.err {
+    background: rgba(220, 38, 38, 0.12);
+    color: var(--danger);
+  }
+
+  .crc32-status.ok {
+    background: var(--badge-new-bg);
+    color: var(--badge-new-text);
+  }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+
+  window.TasteTools['crc32'] = function (root, tool, Taste) {
+    'use strict';
+
+    var $ = Taste.$;
+    var inputEl = $('#crc32-input', root);
+    var outputEl = $('#crc32-output', root);
+    var statusEl = $('#crc32-status', root);
+    var SAVE_KEY = 'tool:crc32:input';
+    var table = buildTable();
+
+    function buildTable() {
+      var result = [];
+
+      for (var value = 0; value < 256; value++) {
+        var crc = value;
+
+        for (var bit = 0; bit < 8; bit++) {
+          crc = (crc & 1) ? (0xedb88320 ^ (crc >>> 1)) : (crc >>> 1);
+        }
+
+        result[value] = crc >>> 0;
+      }
+
+      return result;
+    }
+
+    function crc32(bytes) {
+      var crc = 0xffffffff;
+
+      for (var index = 0; index < bytes.length; index++) {
+        crc = (crc >>> 8) ^ table[(crc ^ bytes[index]) & 0xff];
+      }
+
+      return (crc ^ 0xffffffff) >>> 0;
+    }
+
+    function formatChecksum(value) {
+      return value.toString(16).padStart(8, '0').toUpperCase();
+    }
+
+    function showStatus(kind, message) {
+      statusEl.hidden = false;
+      statusEl.className = 'crc32-status ' + kind;
+      statusEl.innerHTML = '';
+
+      statusEl.appendChild(Taste.el('i', {
+        class: 'bi ' + (
+          kind === 'ok'
+            ? 'bi-check-circle-fill'
+            : 'bi-exclamation-triangle-fill'
+        )
+      }));
+
+      statusEl.appendChild(Taste.el('span', { text: message }));
+    }
+
+    function computeChecksum() {
+      var text = inputEl.value;
+
+      if (!text) {
+        outputEl.value = '';
+        showStatus('err', 'Enter text to checksum first.');
+        return;
+      }
+
+      var bytes = new TextEncoder().encode(text);
+      var checksum = formatChecksum(crc32(bytes));
+
+      outputEl.value = checksum;
+      showStatus('ok', 'CRC32 checksum computed.');
+    }
+
+    var actions = {
+      hash: computeChecksum,
+
+      copy: function () {
+        Taste.copy(outputEl.value);
+      },
+
+      sample: function () {
+        inputEl.value = 'The quick brown fox jumps over the lazy dog';
+        computeChecksum();
+      },
+
+      clear: function () {
+        inputEl.value = '';
+        outputEl.value = '';
+        statusEl.hidden = true;
+        Taste.store.remove(SAVE_KEY);
+      }
+    };
+
+    Taste.on(root, 'click', '[data-act]', function (event, node) {
+      event.preventDefault();
+
+      var action = actions[node.dataset.act];
+      if (action) action();
+    });
+
+    Taste.on(inputEl, 'input', Taste.debounce(function () {
+      Taste.store.set(SAVE_KEY, inputEl.value);
+    }, 300));
+
+    Taste.on(inputEl, 'keydown', function (event) {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        computeChecksum();
+      }
+    });
+
+    var saved = Taste.store.get(SAVE_KEY, '');
+    if (saved) inputEl.value = saved;
+
+    inputEl.focus();
+  };
+</script>
