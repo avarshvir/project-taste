@@ -1,0 +1,258 @@
+<!-- =========================================================================
+     Project Taste — tools/uuid-inspector.html
+     UUID version, variant, and field inspector.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-fingerprint"></i></div>
+  <div class="tool-header-text">
+    <h1>UUID Inspector</h1>
+    <p>Inspect UUID validity, version, variant, and decoded fields locally in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="uuid-inspect-input">UUID</label>
+    <input id="uuid-inspect-input" class="input-taste"
+      placeholder="550e8400-e29b-41d4-a716-446655440000"
+      spellcheck="false" autocomplete="off">
+  </div>
+
+  <div id="uuid-inspect-status" class="uuid-inspect-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="inspect">
+      <i class="bi bi-search"></i> Inspect
+    </button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample">
+      <i class="bi bi-magic"></i> Sample
+    </button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear">
+      <i class="bi bi-x-circle"></i> Clear
+    </button>
+  </div>
+
+  <div class="stat-row" id="uuid-inspect-stats"></div>
+
+  <div class="field">
+    <label class="field-label" for="uuid-inspect-details">Decoded Details</label>
+    <textarea id="uuid-inspect-details" class="textarea-taste"
+      placeholder="UUID details appear here…" readonly spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-success" data-act="copy">
+      <i class="bi bi-clipboard-check"></i> Copy Details
+    </button>
+  </div>
+</div>
+
+<style>
+  .uuid-inspect-status {
+    padding: var(--sp-2) var(--sp-3);
+    margin-bottom: var(--sp-3);
+    border-radius: var(--radius-md);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .uuid-inspect-status.err {
+    background: rgba(220, 38, 38, 0.12);
+    color: var(--danger);
+  }
+
+  .uuid-inspect-status.ok {
+    background: var(--badge-new-bg);
+    color: var(--badge-new-text);
+  }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+
+  window.TasteTools['uuid-inspector'] = function (root, tool, Taste) {
+    'use strict';
+
+    var $ = Taste.$;
+    var inputEl = $('#uuid-inspect-input', root);
+    var statusEl = $('#uuid-inspect-status', root);
+    var statsEl = $('#uuid-inspect-stats', root);
+    var detailsEl = $('#uuid-inspect-details', root);
+    var SAVE_KEY = 'tool:uuid-inspector:input';
+
+    function showStatus(kind, message) {
+      statusEl.hidden = false;
+      statusEl.className = 'uuid-inspect-status ' + kind;
+      statusEl.innerHTML = '';
+
+      statusEl.appendChild(Taste.el('i', {
+        class: 'bi ' + (
+          kind === 'ok'
+            ? 'bi-check-circle-fill'
+            : 'bi-exclamation-triangle-fill'
+        )
+      }));
+
+      statusEl.appendChild(Taste.el('span', { text: message }));
+    }
+
+    function addStat(icon, value, label) {
+      statsEl.appendChild(Taste.el('span', { class: 'stat-chip' }, [
+        Taste.el('i', { class: 'bi ' + icon }),
+        Taste.el('strong', { text: value }),
+        document.createTextNode(' ' + label)
+      ]));
+    }
+
+    function formatTimestamp(timestamp) {
+      if (!Number.isFinite(timestamp)) return 'Unavailable';
+
+      return new Date(timestamp).toISOString() +
+        ' (' + timestamp + ' ms since Unix epoch)';
+    }
+
+    function inspect() {
+      var raw = inputEl.value.trim();
+      var normalized = raw
+        .replace(/[{}]/g, '')
+        .replace(/-/g, '')
+        .toLowerCase();
+
+      statsEl.innerHTML = '';
+      detailsEl.value = '';
+
+      if (!raw) {
+        showStatus('err', 'Enter a UUID first.');
+        return;
+      }
+
+      if (!/^[0-9a-f]{32}$/.test(normalized)) {
+        showStatus('err', 'Invalid UUID. Use 32 hexadecimal characters.');
+        return;
+      }
+
+      var canonical =
+        normalized.slice(0, 8) + '-' +
+        normalized.slice(8, 12) + '-' +
+        normalized.slice(12, 16) + '-' +
+        normalized.slice(16, 20) + '-' +
+        normalized.slice(20);
+
+      var version = parseInt(normalized.charAt(12), 16);
+      var variantBits = parseInt(normalized.charAt(16), 16);
+      var variant;
+
+      if ((variantBits & 0x8) === 0) {
+        variant = 'NCS';
+      } else if ((variantBits & 0xc) === 0x8) {
+        variant = 'RFC 4122 / RFC 9562';
+      } else if ((variantBits & 0xe) === 0xc) {
+        variant = 'Microsoft';
+      } else {
+        variant = 'Reserved';
+      }
+
+      var isNil = normalized === '00000000000000000000000000000000';
+      var versionName = {
+        1: 'Time-based',
+        2: 'DCE Security',
+        3: 'Name-based MD5',
+        4: 'Random',
+        5: 'Name-based SHA-1',
+        6: 'Reordered time-based',
+        7: 'Unix time-based',
+        8: 'Custom'
+      }[version] || 'Unknown';
+
+      addStat('bi-check-circle', 'Valid', 'UUID');
+      addStat('bi-tag', isNil ? 'Nil' : 'v' + version, isNil ? 'UUID' : versionName);
+      addStat('bi-diagram-3', variant, 'variant');
+
+      var lines = [
+        'Canonical: ' + canonical,
+        'Length: 128 bits / 16 bytes',
+        'Version: ' + (isNil ? 'Nil UUID' : version + ' (' + versionName + ')'),
+        'Variant: ' + variant,
+        'Hex: ' + normalized,
+        '',
+        'Fields:',
+        '  time_low:               ' + normalized.slice(0, 8),
+        '  time_mid:               ' + normalized.slice(8, 12),
+        '  time_hi_and_version:    ' + normalized.slice(12, 16),
+        '  clock_seq_hi_and_reserved: ' + normalized.slice(16, 18),
+        '  clock_seq_low:           ' + normalized.slice(18, 20),
+        '  node:                   ' + normalized.slice(20)
+      ];
+
+      if (version === 7) {
+        var unixMilliseconds = parseInt(normalized.slice(0, 12), 16);
+        lines.push('');
+        lines.push('Version 7 timestamp:');
+        lines.push('  ' + formatTimestamp(unixMilliseconds));
+      }
+
+      if (version === 1 || version === 6) {
+        lines.push('');
+        lines.push('Time-based UUID:');
+        lines.push('  Timestamp fields are present.');
+        lines.push('  Clock sequence: ' + normalized.slice(16, 20));
+        lines.push('  Node: ' + normalized.slice(20));
+      }
+
+      detailsEl.value = lines.join('\n');
+      showStatus('ok', 'UUID inspected successfully.');
+      Taste.store.set(SAVE_KEY, raw);
+    }
+
+    var actions = {
+      inspect: inspect,
+
+      sample: function () {
+        inputEl.value = '550e8400-e29b-41d4-a716-446655440000';
+        inspect();
+      },
+
+      copy: function () {
+        Taste.copy(detailsEl.value);
+      },
+
+      clear: function () {
+        inputEl.value = '';
+        statsEl.innerHTML = '';
+        detailsEl.value = '';
+        statusEl.hidden = true;
+        Taste.store.remove(SAVE_KEY);
+      }
+    };
+
+    Taste.on(root, 'click', '[data-act]', function (event, node) {
+      event.preventDefault();
+
+      var action = actions[node.dataset.act];
+      if (action) action();
+    });
+
+    Taste.on(inputEl, 'input', Taste.debounce(function () {
+      Taste.store.set(SAVE_KEY, inputEl.value);
+    }, 300));
+
+    Taste.on(inputEl, 'keydown', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        inspect();
+      }
+    });
+
+    var saved = Taste.store.get(SAVE_KEY, '');
+    if (saved) {
+      inputEl.value = saved;
+      inspect();
+    }
+
+    inputEl.focus();
+  };
+</script>
