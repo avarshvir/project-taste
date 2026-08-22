@@ -1,0 +1,311 @@
+<!-- =========================================================================
+     Project Taste — tools/api-key.html
+     Secure API key generator using crypto.getRandomValues().
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-key-fill"></i></div>
+  <div class="tool-header-text">
+    <h1>API Key Generator</h1>
+    <p>Generate secure, URL-safe API keys locally in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="tool-split">
+    <div class="field">
+      <label class="field-label" for="api-key-prefix">Prefix</label>
+      <input id="api-key-prefix" class="input-taste" type="text"
+        value="tk_" placeholder="Optional prefix" spellcheck="false">
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="api-key-length">Random Part Length</label>
+      <input id="api-key-length" class="input-taste" type="number"
+        min="8" max="256" value="32">
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <label class="field-label" for="api-key-count" style="margin:0 var(--sp-2) 0 0">
+      Quantity
+    </label>
+    <input id="api-key-count" class="input-taste" type="number"
+      min="1" max="100" value="5" style="width:90px">
+
+    <label class="field-label" for="api-key-alphabet"
+      style="margin:0 var(--sp-1) 0 var(--sp-2)">
+      Alphabet
+    </label>
+    <select id="api-key-alphabet" class="select-taste" style="width:auto">
+      <option value="url" selected>URL-safe</option>
+      <option value="hex">Hexadecimal</option>
+      <option value="alphanumeric">Alphanumeric</option>
+    </select>
+  </div>
+
+  <div id="api-key-status" class="api-key-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="generate">
+      <i class="bi bi-arrow-repeat"></i> Generate
+    </button>
+    <button class="btn-taste btn-taste-success" data-act="copyall">
+      <i class="bi bi-clipboard-check"></i> Copy All
+    </button>
+    <button class="btn-taste btn-taste-secondary" data-act="download">
+      <i class="bi bi-download"></i> Download
+    </button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample">
+      <i class="bi bi-magic"></i> Sample
+    </button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear">
+      <i class="bi bi-x-circle"></i> Clear
+    </button>
+  </div>
+
+  <div class="stat-row" id="api-key-stats"></div>
+  <ul class="result-list" id="api-key-results"></ul>
+</div>
+
+<style>
+  .api-key-status {
+    padding: var(--sp-2) var(--sp-3);
+    margin-bottom: var(--sp-3);
+    border-radius: var(--radius-md);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .api-key-status.err {
+    background: rgba(220, 38, 38, 0.12);
+    color: var(--danger);
+  }
+
+  .api-key-status.ok {
+    background: var(--badge-new-bg);
+    color: var(--badge-new-text);
+  }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+
+  window.TasteTools['api-key'] = function (root, tool, Taste) {
+    'use strict';
+
+    var $ = Taste.$;
+    var el = Taste.el;
+
+    var prefixEl = $('#api-key-prefix', root);
+    var lengthEl = $('#api-key-length', root);
+    var countEl = $('#api-key-count', root);
+    var alphabetEl = $('#api-key-alphabet', root);
+    var statusEl = $('#api-key-status', root);
+    var statsEl = $('#api-key-stats', root);
+    var resultsEl = $('#api-key-results', root);
+
+    var current = [];
+    var SAVE_KEY = 'tool:api-key:settings';
+
+    var ALPHABETS = {
+      url: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_',
+      hex: '0123456789abcdef',
+      alphanumeric: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+    };
+
+    function showStatus(kind, message) {
+      statusEl.hidden = false;
+      statusEl.className = 'api-key-status ' + kind;
+      statusEl.innerHTML = '';
+
+      statusEl.appendChild(el('i', {
+        class: 'bi ' + (
+          kind === 'ok'
+            ? 'bi-check-circle-fill'
+            : 'bi-exclamation-triangle-fill'
+        )
+      }));
+
+      statusEl.appendChild(el('span', { text: message }));
+    }
+
+    function randomIndex(max) {
+      var limit = Math.floor(256 / max) * max;
+      var bytes = new Uint8Array(1);
+      var value;
+
+      do {
+        crypto.getRandomValues(bytes);
+        value = bytes[0];
+      } while (value >= limit);
+
+      return value % max;
+    }
+
+    function createRandomPart(length, alphabet) {
+      var result = '';
+
+      for (var index = 0; index < length; index++) {
+        result += alphabet.charAt(randomIndex(alphabet.length));
+      }
+
+      return result;
+    }
+
+    function validateSettings() {
+      var length = Math.max(8, Math.min(256, parseInt(lengthEl.value, 10) || 32));
+      var count = Math.max(1, Math.min(100, parseInt(countEl.value, 10) || 5));
+      var alphabet = ALPHABETS[alphabetEl.value];
+
+      lengthEl.value = length;
+      countEl.value = count;
+
+      if (!alphabet) {
+        showStatus('err', 'Select an alphabet first.');
+        return null;
+      }
+
+      return {
+        prefix: prefixEl.value,
+        length: length,
+        count: count,
+        alphabet: alphabet
+      };
+    }
+
+    function renderStats(settings) {
+      statsEl.innerHTML = '';
+
+      [
+        ['bi-rulers', settings.length + ' random characters'],
+        ['bi-list-ol', settings.count + ' generated'],
+        ['bi-shield-check', 'CSPRNG protected']
+      ].forEach(function (stat) {
+        statsEl.appendChild(el('span', { class: 'stat-chip' }, [
+          el('i', { class: 'bi ' + stat[0] }),
+          el('strong', { text: stat[1].split(' ')[0] }),
+          document.createTextNode(' ' + stat[1].split(' ').slice(1).join(' '))
+        ]));
+      });
+    }
+
+    function renderResults() {
+      resultsEl.innerHTML = '';
+
+      current.forEach(function (apiKey) {
+        resultsEl.appendChild(el('li', {}, [
+          el('i', {
+            class: 'bi bi-key',
+            style: 'color:var(--accent)'
+          }),
+          el('span', { text: apiKey }),
+          el('button', {
+            class: 'copy-inline',
+            type: 'button',
+            title: 'Copy',
+            onclick: function () {
+              Taste.copy(apiKey);
+            }
+          }, [
+            el('i', { class: 'bi bi-clipboard' })
+          ])
+        ]));
+      });
+    }
+
+    function save(settings) {
+      Taste.store.set(SAVE_KEY, {
+        prefix: settings.prefix,
+        length: settings.length,
+        count: settings.count,
+        alphabet: alphabetEl.value
+      });
+    }
+
+    function generate() {
+      var settings = validateSettings();
+      if (!settings) return;
+
+      current = [];
+
+      for (var index = 0; index < settings.count; index++) {
+        current.push(
+          settings.prefix +
+          createRandomPart(settings.length, settings.alphabet)
+        );
+      }
+
+      renderStats(settings);
+      renderResults();
+      save(settings);
+      showStatus('ok', settings.count + ' secure API key' +
+        (settings.count === 1 ? '' : 's') + ' generated.');
+    }
+
+    var actions = {
+      generate: generate,
+
+      copyall: function () {
+        current.length
+          ? Taste.copy(current.join('\n'))
+          : Taste.toast('Generate some API keys first', 'info');
+      },
+
+      download: function () {
+        current.length
+          ? Taste.download('taste-api-keys.txt', current.join('\n'))
+          : Taste.toast('Nothing to download', 'info');
+      },
+
+      sample: function () {
+        prefixEl.value = 'sk_live_';
+        lengthEl.value = 32;
+        countEl.value = 3;
+        alphabetEl.value = 'url';
+        generate();
+      },
+
+      clear: function () {
+        current = [];
+        resultsEl.innerHTML = '';
+        statsEl.innerHTML = '';
+        statusEl.hidden = true;
+        Taste.store.remove(SAVE_KEY);
+      }
+    };
+
+    Taste.on(root, 'click', '[data-act]', function (event, node) {
+      event.preventDefault();
+
+      var action = actions[node.dataset.act];
+      if (action) action();
+    });
+
+    Taste.on(root, 'change', 'select, input', function () {
+      var settings = validateSettings();
+      if (settings) save(settings);
+    });
+
+    Taste.on(root, 'keydown', 'input', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        generate();
+      }
+    });
+
+    var saved = Taste.store.get(SAVE_KEY, null);
+
+    if (saved) {
+      prefixEl.value = saved.prefix || '';
+      lengthEl.value = saved.length || 32;
+      countEl.value = saved.count || 5;
+      alphabetEl.value = saved.alphabet || 'url';
+    }
+
+    generate();
+  };
+</script>
