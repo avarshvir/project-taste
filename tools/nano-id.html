@@ -1,0 +1,297 @@
+<!-- =========================================================================
+     Project Taste — tools/nano-id.html
+     Secure Nano ID generator using crypto.getRandomValues().
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-dot"></i></div>
+  <div class="tool-header-text">
+    <h1>Nano ID Generator</h1>
+    <p>Generate compact, URL-safe, cryptographically secure IDs locally in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="toolbar">
+    <label class="field-label" for="nano-length" style="margin:0 var(--sp-1) 0 0">
+      Length
+    </label>
+    <input id="nano-length" class="input-taste" type="number"
+      min="1" max="256" value="21" style="width:90px">
+
+    <label class="field-label" for="nano-count" style="margin:0 var(--sp-1) 0 var(--sp-2)">
+      Quantity
+    </label>
+    <input id="nano-count" class="input-taste" type="number"
+      min="1" max="500" value="5" style="width:90px">
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="nano-alphabet">
+      Alphabet
+      <span class="field-hint">(unique characters, maximum 256)</span>
+    </label>
+    <input id="nano-alphabet" class="input-taste"
+      value="_-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+      spellcheck="false">
+  </div>
+
+  <div id="nano-status" class="nano-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="generate">
+      <i class="bi bi-arrow-repeat"></i> Generate
+    </button>
+    <button class="btn-taste btn-taste-success" data-act="copyall">
+      <i class="bi bi-clipboard-check"></i> Copy All
+    </button>
+    <button class="btn-taste btn-taste-secondary" data-act="download">
+      <i class="bi bi-download"></i> Download
+    </button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample">
+      <i class="bi bi-magic"></i> Sample
+    </button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear">
+      <i class="bi bi-x-circle"></i> Clear
+    </button>
+  </div>
+
+  <div class="stat-row" id="nano-stats"></div>
+  <ul class="result-list" id="nano-results"></ul>
+</div>
+
+<style>
+  .nano-status {
+    padding: var(--sp-2) var(--sp-3);
+    margin-bottom: var(--sp-3);
+    border-radius: var(--radius-md);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .nano-status.err {
+    background: rgba(220, 38, 38, 0.12);
+    color: var(--danger);
+  }
+
+  .nano-status.ok {
+    background: var(--badge-new-bg);
+    color: var(--badge-new-text);
+  }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+
+  window.TasteTools['nano-id'] = function (root, tool, Taste) {
+    'use strict';
+
+    var $ = Taste.$;
+    var el = Taste.el;
+
+    var lengthEl = $('#nano-length', root);
+    var countEl = $('#nano-count', root);
+    var alphabetEl = $('#nano-alphabet', root);
+    var statusEl = $('#nano-status', root);
+    var statsEl = $('#nano-stats', root);
+    var resultsEl = $('#nano-results', root);
+
+    var current = [];
+    var SAVE_KEY = 'tool:nano-id:settings';
+
+    function showStatus(kind, message) {
+      statusEl.hidden = false;
+      statusEl.className = 'nano-status ' + kind;
+      statusEl.innerHTML = '';
+
+      statusEl.appendChild(el('i', {
+        class: 'bi ' + (
+          kind === 'ok'
+            ? 'bi-check-circle-fill'
+            : 'bi-exclamation-triangle-fill'
+        )
+      }));
+
+      statusEl.appendChild(el('span', { text: message }));
+    }
+
+    function secureRandomBytes(length) {
+      var bytes = new Uint8Array(length);
+      crypto.getRandomValues(bytes);
+      return bytes;
+    }
+
+    function createNanoId(length, alphabet) {
+      var alphabetLength = alphabet.length;
+      var mask = (2 << Math.floor(Math.log2(alphabetLength - 1))) - 1;
+      var step = Math.ceil(1.6 * mask * length / alphabetLength);
+      var result = '';
+
+      while (result.length < length) {
+        var bytes = secureRandomBytes(step);
+
+        for (var index = 0; index < bytes.length; index++) {
+          var characterIndex = bytes[index] & mask;
+
+          if (characterIndex < alphabetLength) {
+            result += alphabet.charAt(characterIndex);
+
+            if (result.length === length) break;
+          }
+        }
+      }
+
+      return result;
+    }
+
+    function validateSettings() {
+      var length = Math.max(1, Math.min(256, parseInt(lengthEl.value, 10) || 21));
+      var count = Math.max(1, Math.min(500, parseInt(countEl.value, 10) || 5));
+      var alphabet = alphabetEl.value;
+
+      lengthEl.value = length;
+      countEl.value = count;
+
+      if (!alphabet) {
+        showStatus('err', 'Enter an alphabet first.');
+        return null;
+      }
+
+      if (alphabet.length > 256) {
+        showStatus('err', 'The alphabet cannot contain more than 256 characters.');
+        return null;
+      }
+
+      if (new Set(Array.from(alphabet)).size !== alphabet.length) {
+        showStatus('err', 'The alphabet must contain unique characters.');
+        return null;
+      }
+
+      return {
+        length: length,
+        count: count,
+        alphabet: alphabet
+      };
+    }
+
+    function renderStats(settings) {
+      statsEl.innerHTML = '';
+
+      [
+        ['bi-rulers', settings.length + ' characters'],
+        ['bi-list-ol', settings.count + ' generated'],
+        ['bi-fonts', settings.alphabet.length + ' alphabet symbols']
+      ].forEach(function (stat) {
+        statsEl.appendChild(el('span', { class: 'stat-chip' }, [
+          el('i', { class: 'bi ' + stat[0] }),
+          el('strong', { text: stat[1].split(' ')[0] }),
+          document.createTextNode(' ' + stat[1].split(' ').slice(1).join(' '))
+        ]));
+      });
+    }
+
+    function renderResults() {
+      resultsEl.innerHTML = '';
+
+      current.forEach(function (value) {
+        resultsEl.appendChild(el('li', {}, [
+          el('i', {
+            class: 'bi bi-dot',
+            style: 'color:var(--accent)'
+          }),
+          el('span', { text: value }),
+          el('button', {
+            class: 'copy-inline',
+            type: 'button',
+            title: 'Copy',
+            onclick: function () {
+              Taste.copy(value);
+            }
+          }, [
+            el('i', { class: 'bi bi-clipboard' })
+          ])
+        ]));
+      });
+    }
+
+    function save(settings) {
+      Taste.store.set(SAVE_KEY, settings);
+    }
+
+    function generate() {
+      var settings = validateSettings();
+      if (!settings) return;
+
+      current = [];
+
+      for (var index = 0; index < settings.count; index++) {
+        current.push(createNanoId(settings.length, settings.alphabet));
+      }
+
+      renderStats(settings);
+      renderResults();
+      save(settings);
+      showStatus('ok', settings.count + ' secure Nano ID' +
+        (settings.count === 1 ? '' : 's') + ' generated.');
+    }
+
+    var actions = {
+      generate: generate,
+
+      copyall: function () {
+        current.length
+          ? Taste.copy(current.join('\n'))
+          : Taste.toast('Generate some Nano IDs first', 'info');
+      },
+
+      download: function () {
+        current.length
+          ? Taste.download('taste-nano-ids.txt', current.join('\n'))
+          : Taste.toast('Nothing to download', 'info');
+      },
+
+      sample: function () {
+        lengthEl.value = 12;
+        countEl.value = 3;
+        alphabetEl.value = '_-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        generate();
+      },
+
+      clear: function () {
+        current = [];
+        resultsEl.innerHTML = '';
+        statsEl.innerHTML = '';
+        statusEl.hidden = true;
+        Taste.store.remove(SAVE_KEY);
+      }
+    };
+
+    Taste.on(root, 'click', '[data-act]', function (event, node) {
+      event.preventDefault();
+
+      var action = actions[node.dataset.act];
+      if (action) action();
+    });
+
+    Taste.on(root, 'keydown', 'input', function (event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        generate();
+      }
+    });
+
+    var saved = Taste.store.get(SAVE_KEY, null);
+
+    if (saved) {
+      lengthEl.value = saved.length || 21;
+      countEl.value = saved.count || 5;
+      alphabetEl.value = saved.alphabet ||
+        '_-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    }
+
+    generate();
+  };
+</script>
