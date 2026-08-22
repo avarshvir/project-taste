@@ -1,0 +1,260 @@
+<!-- =========================================================================
+     Project Taste — tools/hmac-generator.html
+     HMAC generator using the browser Web Crypto API.
+     ========================================================================= -->
+
+<div class="tool-header">
+  <div class="tool-header-icon"><i class="bi bi-shield-check"></i></div>
+  <div class="tool-header-text">
+    <h1>HMAC Generator</h1>
+    <p>Generate keyed HMAC signatures locally in your browser.</p>
+  </div>
+</div>
+
+<div class="tool-card-panel">
+  <div class="field">
+    <label class="field-label" for="hmac-key">Secret Key</label>
+    <input id="hmac-key" class="input-taste" type="text"
+      placeholder="Enter a secret key" spellcheck="false">
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="hmac-message">Message</label>
+    <textarea id="hmac-message" class="textarea-taste"
+      placeholder="Enter the message to sign…" spellcheck="false"></textarea>
+  </div>
+
+  <div class="toolbar">
+    <label class="field-label" for="hmac-algorithm" style="margin:0 var(--sp-1) 0 0">
+      Algorithm
+    </label>
+
+    <select id="hmac-algorithm" class="select-taste" style="width:auto">
+      <option value="SHA-1">HMAC-SHA1</option>
+      <option value="SHA-256" selected>HMAC-SHA256</option>
+      <option value="SHA-384">HMAC-SHA384</option>
+      <option value="SHA-512">HMAC-SHA512</option>
+    </select>
+
+    <label class="field-label" for="hmac-format" style="margin:0 var(--sp-1) 0 var(--sp-2)">
+      Output
+    </label>
+
+    <select id="hmac-format" class="select-taste" style="width:auto">
+      <option value="hex" selected>Hexadecimal</option>
+      <option value="base64">Base64</option>
+    </select>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="hmac-output">Signature</label>
+    <textarea id="hmac-output" class="textarea-taste"
+      placeholder="HMAC signature appears here…" readonly spellcheck="false"></textarea>
+  </div>
+
+  <div id="hmac-status" class="hmac-status" hidden></div>
+
+  <div class="toolbar">
+    <button class="btn-taste btn-taste-primary" data-act="generate">
+      <i class="bi bi-shield-check"></i> Generate HMAC
+    </button>
+    <button class="btn-taste btn-taste-success" data-act="copy">
+      <i class="bi bi-clipboard-check"></i> Copy
+    </button>
+    <button class="btn-taste btn-taste-ghost" data-act="sample">
+      <i class="bi bi-magic"></i> Sample
+    </button>
+    <button class="btn-taste btn-taste-ghost" data-act="clear">
+      <i class="bi bi-x-circle"></i> Clear
+    </button>
+  </div>
+</div>
+
+<style>
+  .hmac-status {
+    padding: var(--sp-2) var(--sp-3);
+    margin-bottom: var(--sp-3);
+    border-radius: var(--radius-md);
+    font-size: var(--fs-sm);
+    font-weight: var(--fw-medium);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+  }
+
+  .hmac-status.err {
+    background: rgba(220, 38, 38, 0.12);
+    color: var(--danger);
+  }
+
+  .hmac-status.ok {
+    background: var(--badge-new-bg);
+    color: var(--badge-new-text);
+  }
+</style>
+
+<script>
+  window.TasteTools = window.TasteTools || {};
+
+  window.TasteTools['hmac-generator'] = function (root, tool, Taste) {
+    'use strict';
+
+    var $ = Taste.$;
+    var keyEl = $('#hmac-key', root);
+    var messageEl = $('#hmac-message', root);
+    var algorithmEl = $('#hmac-algorithm', root);
+    var formatEl = $('#hmac-format', root);
+    var outputEl = $('#hmac-output', root);
+    var statusEl = $('#hmac-status', root);
+
+    var SAVE_KEY = 'tool:hmac-generator:values';
+
+    function showStatus(kind, message) {
+      statusEl.hidden = false;
+      statusEl.className = 'hmac-status ' + kind;
+      statusEl.innerHTML = '';
+
+      statusEl.appendChild(Taste.el('i', {
+        class: 'bi ' + (
+          kind === 'ok'
+            ? 'bi-check-circle-fill'
+            : 'bi-exclamation-triangle-fill'
+        )
+      }));
+
+      statusEl.appendChild(Taste.el('span', { text: message }));
+    }
+
+    function bytesToHex(bytes) {
+      return Array.from(bytes)
+        .map(function (byte) {
+          return byte.toString(16).padStart(2, '0');
+        })
+        .join('');
+    }
+
+    function bytesToBase64(bytes) {
+      var binary = '';
+
+      for (var index = 0; index < bytes.length; index++) {
+        binary += String.fromCharCode(bytes[index]);
+      }
+
+      return btoa(binary);
+    }
+
+    async function generateHmac() {
+      var key = keyEl.value;
+      var message = messageEl.value;
+
+      if (!key) {
+        outputEl.value = '';
+        showStatus('err', 'Enter a secret key first.');
+        return;
+      }
+
+      if (!message) {
+        outputEl.value = '';
+        showStatus('err', 'Enter a message first.');
+        return;
+      }
+
+      try {
+        var encoder = new TextEncoder();
+        var cryptoKey = await crypto.subtle.importKey(
+          'raw',
+          encoder.encode(key),
+          {
+            name: 'HMAC',
+            hash: algorithmEl.value
+          },
+          false,
+          ['sign']
+        );
+
+        var signature = await crypto.subtle.sign(
+          'HMAC',
+          cryptoKey,
+          encoder.encode(message)
+        );
+
+        var bytes = new Uint8Array(signature);
+        outputEl.value = formatEl.value === 'base64'
+          ? bytesToBase64(bytes)
+          : bytesToHex(bytes);
+
+        showStatus('ok', algorithmEl.value + ' HMAC signature generated.');
+        save();
+      } catch (error) {
+        outputEl.value = '';
+        showStatus('err', 'HMAC generation failed: ' + error.message);
+      }
+    }
+
+    function save() {
+      Taste.store.set(SAVE_KEY, {
+        key: keyEl.value,
+        message: messageEl.value,
+        algorithm: algorithmEl.value,
+        format: formatEl.value
+      });
+    }
+
+    var actions = {
+      generate: generateHmac,
+
+      copy: function () {
+        Taste.copy(outputEl.value);
+      },
+
+      sample: function () {
+        keyEl.value = 'secret-key';
+        messageEl.value = 'The quick brown fox jumps over the lazy dog';
+        algorithmEl.value = 'SHA-256';
+        formatEl.value = 'hex';
+        generateHmac();
+      },
+
+      clear: function () {
+        keyEl.value = '';
+        messageEl.value = '';
+        outputEl.value = '';
+        statusEl.hidden = true;
+        Taste.store.remove(SAVE_KEY);
+      }
+    };
+
+    Taste.on(root, 'click', '[data-act]', function (event, node) {
+      event.preventDefault();
+
+      var action = actions[node.dataset.act];
+      if (action) action();
+    });
+
+    Taste.on([algorithmEl, formatEl], 'change', function () {
+      if (outputEl.value) generateHmac();
+      save();
+    });
+
+    Taste.on(keyEl, 'input', Taste.debounce(save, 300));
+    Taste.on(messageEl, 'input', Taste.debounce(save, 300));
+
+    Taste.on(messageEl, 'keydown', function (event) {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        generateHmac();
+      }
+    });
+
+    var saved = Taste.store.get(SAVE_KEY, null);
+
+    if (saved) {
+      keyEl.value = saved.key || '';
+      messageEl.value = saved.message || '';
+      algorithmEl.value = saved.algorithm || 'SHA-256';
+      formatEl.value = saved.format || 'hex';
+    }
+
+    keyEl.focus();
+  };
+</script>
