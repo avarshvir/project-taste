@@ -531,7 +531,7 @@
       "icon": "bi-hash",
       "desc": "Compute SHA-512 hashes.",
       "badges": [],
-      "status": "soon"
+      "status": "ready"
     },
     {
       "id": "crc32",
@@ -540,7 +540,7 @@
       "icon": "bi-hash",
       "desc": "Compute CRC32 checksums.",
       "badges": [],
-      "status": "soon"
+      "status": "ready"
     },
     {
       "id": "hmac-generator",
@@ -551,7 +551,7 @@
       "badges": [
         "niche"
       ],
-      "status": "soon"
+      "status": "ready"
     },
     {
       "id": "uuid",
@@ -573,7 +573,7 @@
       "badges": [
         "niche"
       ],
-      "status": "soon"
+      "status": "ready"
     },
     {
       "id": "nano-id",
@@ -584,7 +584,7 @@
       "badges": [
         "niche"
       ],
-      "status": "soon"
+      "status": "ready"
     },
     {
       "id": "password",
@@ -602,7 +602,7 @@
       "icon": "bi-key-fill",
       "desc": "Generate secure random API keys.",
       "badges": [],
-      "status": "soon"
+      "status": "ready"
     },
     {
       "id": "random-number",
