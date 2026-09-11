@@ -1415,12 +1415,6 @@
         "niche"
       ],
       "status": "soon"
-    },
-    {
-      "id": "broken-test-tool",
-      "name": "Broken Test",
-      "category": "non-existent-category",
-      "status": "ready"
     }
   ]
 }
